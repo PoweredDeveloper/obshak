@@ -1,0 +1,41 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+
+export function useTeacherRating(teacherId: string) {
+  const { profile } = useAuth();
+  const queryClient = useQueryClient();
+
+  // Мутация для установки/обновления рейтинга
+  const rateMutation = useMutation({
+    mutationFn: async (rating: number) => {
+      if (!profile?.id) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('teacher_ratings')
+        .upsert({
+          teacher_id: teacherId,
+          user_id: profile.id,
+          rating,
+        }, {
+          onConflict: 'teacher_id,user_id',
+        });
+
+      if (error) throw error;
+      return rating;
+    },
+    onSuccess: (rating) => {
+      // Инвалидируем все запросы teachers с любым limit
+      // Это обновит кеш для всех вариантов pagination
+      queryClient.invalidateQueries({ 
+        queryKey: ['teachers', profile?.id],
+        exact: false // Инвалидирует все ключи начинающиеся с ['teachers', userId]
+      });
+    },
+  });
+
+  return {
+    rateTeacher: rateMutation.mutate,
+    isRating: rateMutation.isPending,
+  };
+}

@@ -97,7 +97,7 @@ export default function WeekView() {
               {day.classes.length > 0 ? (
                 <div className="space-y-2">
                   {day.classes.map((cls, i) => (
-                    <ClassCard key={cls.id} cls={cls} index={i} />
+                    <ClassCard key={cls.id} cls={cls} index={i} dayIndex={day.dayIndex} />
                   ))}
                 </div>
               ) : (

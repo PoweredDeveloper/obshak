@@ -8,6 +8,7 @@ import {
   getTelegramInitData,
 } from '@/lib/telegram-auth';
 import { initActivityTracking } from '@/lib/activity-tracker';
+import { clearGroupsCache } from '@/hooks/use-groups';
 
 interface Notification {
   key: string;
@@ -257,6 +258,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setProfile(null);
     setError(null);
+    clearGroupsCache(); // Очищаем кеш групп при выходе
   }, []);
 
   const updateProfileFn = useCallback(async (updates: Partial<DbProfile>) => {

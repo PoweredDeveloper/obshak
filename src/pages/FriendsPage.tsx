@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Plus, BookOpen, Trash2, Search } from 'lucide-react';
 import { useFavoriteGroups } from '@/hooks/use-favorite-groups';
 import { ScheduleModal } from '@/components/ScheduleModal';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +37,17 @@ export default function FriendsPage() {
   const [institutes, setInstitutes] = useState<Institute[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [groupsLoaded, setGroupsLoaded] = useState(false);
+
+  // Управление клавиатурой Telegram WebApp
+  useEffect(() => {
+    const tg = (window as any).Telegram?.WebApp;
+    if (!tg) return;
+
+    if (isAddDialogOpen) {
+      // Разворачиваем WebApp на весь экран
+      tg.expand();
+    }
+  }, [isAddDialogOpen]);
 
   // Загружаем группы только один раз
   useEffect(() => {
@@ -110,33 +121,36 @@ export default function FriendsPage() {
             </p>
           </div>
           
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
+          <Sheet open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <SheetTrigger asChild>
               <button className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105">
                 <Plus className="w-4 h-4" />
                 <span>Добавить</span>
               </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
-              <DialogHeader>
-                <DialogTitle className="text-xl">Добавить группу</DialogTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Найдите группу друга или другого курса
-                </p>
-              </DialogHeader>
-              
-              <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Поиск по названию группы..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
+              <div className="px-6 pt-6 pb-4 flex-shrink-0 border-b">
+                <SheetHeader className="text-left p-0">
+                  <SheetTitle className="text-xl">Добавить группу</SheetTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Найдите группу друга или другого курса
+                  </p>
+                </SheetHeader>
+                
+                <div className="relative mt-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    inputMode="search"
+                    placeholder="Поиск по названию группы..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              <div className="flex-1 overflow-y-auto px-6 py-4">
                 {loadingGroups ? (
                   <div className="text-center py-12 text-muted-foreground">
                     <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
@@ -150,38 +164,40 @@ export default function FriendsPage() {
                     </p>
                   </div>
                 ) : (
-                  filteredGroups.map((group) => {
-                    const info = getGroupInfo(group);
-                    const isFav = favorites.some(f => f.group_id === group.id);
-                    
-                    return (
-                      <button
-                        key={group.id}
-                        onClick={() => !isFav && handleAddFavorite(group)}
-                        disabled={isFav}
-                        className={`w-full p-3 rounded-xl border text-left transition-all ${
-                          isFav
-                            ? 'bg-secondary/50 border-border cursor-not-allowed opacity-60'
-                            : 'hover:bg-secondary border-border hover:border-primary/30 hover:shadow-sm'
-                        }`}
-                      >
-                        <p className="font-semibold text-sm text-foreground">{group.name}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {info.instituteName} • {info.course} курс
-                        </p>
-                        {isFav && (
-                          <p className="text-xs text-primary mt-1.5 flex items-center gap-1">
-                            <span>✓</span>
-                            <span>Уже в избранном</span>
+                  <div className="space-y-2">
+                    {filteredGroups.map((group) => {
+                      const info = getGroupInfo(group);
+                      const isFav = favorites.some(f => f.group_id === group.id);
+                      
+                      return (
+                        <button
+                          key={group.id}
+                          onClick={() => !isFav && handleAddFavorite(group)}
+                          disabled={isFav}
+                          className={`w-full p-3 rounded-xl border text-left transition-all ${
+                            isFav
+                              ? 'bg-secondary/50 border-border cursor-not-allowed opacity-60'
+                              : 'hover:bg-secondary border-border hover:border-primary/30 hover:shadow-sm'
+                          }`}
+                        >
+                          <p className="font-semibold text-sm text-foreground">{group.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {info.instituteName} • {info.course} курс
                           </p>
-                        )}
-                      </button>
-                    );
-                  })
+                          {isFav && (
+                            <p className="text-xs text-primary mt-1.5 flex items-center gap-1">
+                              <span>✓</span>
+                              <span>Уже в избранном</span>
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
-            </DialogContent>
-          </Dialog>
+            </SheetContent>
+          </Sheet>
         </div>
 
         {/* Показываем empty state сразу, если нет избранного */}

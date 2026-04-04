@@ -142,8 +142,15 @@ export function parseTime(time: string): { hours: number; minutes: number } {
   return { hours, minutes };
 }
 
-export function isCurrentClass(cls: ClassSession): boolean {
+export function isCurrentClass(cls: ClassSession, dayIndex?: number): boolean {
   const now = new Date();
+  const todayIndex = getTodayDayIndex();
+  
+  // Если передан dayIndex, проверяем что это сегодняшний день
+  if (dayIndex !== undefined && dayIndex !== todayIndex) {
+    return false;
+  }
+  
   const start = parseTime(cls.startTime);
   const end = parseTime(cls.endTime);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();

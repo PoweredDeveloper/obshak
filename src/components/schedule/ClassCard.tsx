@@ -8,6 +8,7 @@ interface ClassCardProps {
   cls: ClassSession;
   index: number;
   variant?: 'default' | 'current' | 'next';
+  dayIndex?: number; // Индекс дня недели (0-6)
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -17,8 +18,8 @@ const TYPE_LABELS: Record<string, string> = {
   practice: 'Практика',
 };
 
-export function ClassCard({ cls, index, variant = 'default' }: ClassCardProps) {
-  const isCurrent = variant === 'current' || isCurrentClass(cls);
+export function ClassCard({ cls, index, variant = 'default', dayIndex }: ClassCardProps) {
+  const isCurrent = variant === 'current' || isCurrentClass(cls, dayIndex);
   const progress = isCurrent ? getClassProgress(cls) : 0;
   const timeLeft = isCurrent ? getTimeLeftMinutes(cls.endTime) : 0;
 

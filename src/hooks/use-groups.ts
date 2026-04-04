@@ -2,13 +2,32 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Group } from '@/lib/schedule-data';
 
+// Кеш для групп (в памяти приложения)
+let cachedGroups: Group[] | null = null;
+let cacheTimestamp: number | null = null;
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 часа
+
+// Функция для очистки кеша (экспортируем для использования при logout)
+export function clearGroupsCache() {
+  cachedGroups = null;
+  cacheTimestamp = null;
+}
+
 export function useGroups() {
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [groups, setGroups] = useState<Group[]>(cachedGroups || []);
+  const [loading, setLoading] = useState(!cachedGroups);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchGroups() {
+      // Проверяем кеш
+      if (cachedGroups && cacheTimestamp && Date.now() - cacheTimestamp < CACHE_DURATION) {
+        console.log('Using cached groups');
+        setGroups(cachedGroups);
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError(null);
@@ -55,6 +74,11 @@ export function useGroups() {
         });
 
         console.log('Formatted groups:', formattedGroups.slice(0, 3));
+        
+        // Сохраняем в кеш
+        cachedGroups = formattedGroups;
+        cacheTimestamp = Date.now();
+        
         setGroups(formattedGroups);
       } catch (err) {
         console.error('Error fetching groups:', err);

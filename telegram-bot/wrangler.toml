@@ -1,0 +1,10 @@
+name = "obshak-bot"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Переменные окружения (добавьте через Cloudflare Dashboard)
+# BOT_TOKEN = "ваш_токен_бота"
+# MINI_APP_URL = "https://obshak.pages.dev"
+
+[env.production]
+name = "obshak-bot"

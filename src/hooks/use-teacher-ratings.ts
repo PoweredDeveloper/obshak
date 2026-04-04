@@ -25,11 +25,11 @@ export function useTeacherRating(teacherId: string) {
       return rating;
     },
     onSuccess: (rating) => {
-      // Инвалидируем все запросы teachers с любым limit
-      // Это обновит кеш для всех вариантов pagination
+      // Инвалидируем все запросы teachers
+      // Это обновит кеш для всех вариантов пагинации, поиска и сортировки
       queryClient.invalidateQueries({ 
-        queryKey: ['teachers', profile?.id],
-        exact: false // Инвалидирует все ключи начинающиеся с ['teachers', userId]
+        queryKey: ['teachers'],
+        exact: false // Инвалидирует все ключи начинающиеся с ['teachers']
       });
     },
   });

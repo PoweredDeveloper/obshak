@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Star, ChevronRight, ArrowLeft, Heart, Search, ArrowUpDown, X, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTeachers } from '@/hooks/use-teachers';
+import { useTeachersRealtime } from '@/hooks/use-teachers-realtime';
 import { useTeacherRating } from '@/hooks/use-teacher-ratings';
 import { useServiceCategories, useServices } from '@/hooks/use-services';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,6 +19,10 @@ export default function TeachersPage() {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const servicesEnabled = useFeatureFlag('features.services_enabled');
+  
+  // Подключаем Realtime для автоматического обновления рейтингов
+  useTeachersRealtime();
+  
   const [activeTab, setActiveTab] = useState<Tab>('teachers');
   const [selected, setSelected] = useState<Teacher | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(() => {
@@ -30,11 +35,19 @@ export default function TeachersPage() {
     }
   });
   const [searchInput, setSearchInput] = useState(''); // Для инпута
+  const debouncedSearch = useDebouncedValue(searchInput, 800); // Debounce для серверного поиска (увеличено до 800мс)
   const [sortBy, setSortBy] = useState<'rating' | 'name'>('rating');
   const [showFilters, setShowFilters] = useState(false);
-  const [displayLimit, setDisplayLimit] = useState(20);
+  const [offset, setOffset] = useState(0);
+  const limit = 20;
   
-  const { data: allTeachers, isLoading, error } = useTeachers(profile?.id);
+  const { data: teachersData, isLoading, error } = useTeachers({
+    userId: profile?.id,
+    limit,
+    offset,
+    searchQuery: debouncedSearch,
+    sortBy,
+  });
   const { data: serviceCategories } = useServiceCategories({ enabled: servicesEnabled }); // Загружаем только если услуги включены
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [serviceSearchQuery, setServiceSearchQuery] = useState('');
@@ -50,6 +63,10 @@ export default function TeachersPage() {
   }, { enabled: servicesEnabled }); // Запрос только если услуги включены
 
   // Сброс offset при изменении фильтров
+  useEffect(() => {
+    setOffset(0);
+  }, [debouncedSearch, sortBy]);
+
   useEffect(() => {
     setServiceOffset(0);
   }, [selectedCategory, debouncedServiceSearch]);
@@ -78,52 +95,18 @@ export default function TeachersPage() {
     });
   };
 
-  // Сброс displayLimit при изменении поиска или сортировки
-  useEffect(() => {
-    setDisplayLimit(20);
-  }, [searchInput, sortBy]);
+  // Разделяем на избранное и обычные (на клиенте)
+  const { favoriteTeachers, regularTeachers } = useMemo(() => {
+    if (!teachersData) return { favoriteTeachers: [], regularTeachers: [] };
 
-  // Мемоизация фильтрации и сортировки на клиенте
-  const { favoriteTeachers, regularTeachers, hasMore } = useMemo(() => {
-    if (!allTeachers) return { favoriteTeachers: [], regularTeachers: [], hasMore: false };
-
-    // Фильтрация по поиску
-    const filtered = allTeachers.filter(teacher => {
-      if (!searchInput.trim()) return true;
-      const query = searchInput.toLowerCase();
-      return (
-        teacher.full_name.toLowerCase().includes(query) ||
-        teacher.department?.toLowerCase().includes(query)
-      );
-    });
-
-    // Сортировка
-    const sortFn = (a: Teacher, b: Teacher) => {
-      if (sortBy === 'rating') {
-        const ratingA = a.average_rating || 0;
-        const ratingB = b.average_rating || 0;
-        return ratingB - ratingA;
-      } else {
-        return a.full_name.localeCompare(b.full_name, 'ru');
-      }
-    };
-
-    const sorted = [...filtered].sort(sortFn);
-
-    // Разделяем на избранное и обычные
-    const favs = sorted.filter(t => favorites.has(t.id));
-    const regular = sorted.filter(t => !favorites.has(t.id));
-
-    // Pagination на клиенте
-    const limitedRegular = regular.slice(0, displayLimit);
-    const hasMore = regular.length > displayLimit;
+    const favs = teachersData.teachers.filter(t => favorites.has(t.id));
+    const regular = teachersData.teachers.filter(t => !favorites.has(t.id));
 
     return {
       favoriteTeachers: favs,
-      regularTeachers: limitedRegular,
-      hasMore,
+      regularTeachers: regular,
     };
-  }, [allTeachers, searchInput, sortBy, favorites, displayLimit]);
+  }, [teachersData, favorites]);
 
   if (isLoading) {
     return (
@@ -462,14 +445,22 @@ export default function TeachersPage() {
             </div>
 
             {/* Кнопка "Показать еще" */}
-            {hasMore && (
+            {teachersData?.hasMore && (
               <div className="mt-4 text-center">
                 <button
-                  onClick={() => setDisplayLimit(prev => prev + 20)}
-                  className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-sm hover:shadow-md transition-all"
+                  onClick={() => setOffset(prev => prev + limit)}
+                  disabled={isLoading}
+                  className="px-6 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow-sm hover:shadow-md transition-all disabled:opacity-50"
                 >
-                  Показать еще
+                  {isLoading ? 'Загрузка...' : 'Показать еще'}
                 </button>
+              </div>
+            )}
+
+            {/* Счетчик */}
+            {teachersData && teachersData.teachers.length > 0 && (
+              <div className="text-center text-xs text-muted-foreground mt-2">
+                Показано {offset + teachersData.teachers.length} из {teachersData.total}
               </div>
             )}
             </>

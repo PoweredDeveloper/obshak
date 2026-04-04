@@ -48,10 +48,24 @@ def main():
     # Очищаем таблицу teachers
     print("\n🗑️  Очистка таблицы teachers...")
     try:
-        supabase.table('teachers').delete().neq('id', '00000000-0000-0000-0000-000000000000').execute()
+        # Удаляем все записи
+        result = supabase.table('teachers').delete().gte('id', '00000000-0000-0000-0000-000000000000').execute()
         print("✓ Таблица очищена")
     except Exception as e:
         print(f"⚠️  Ошибка при очистке: {e}")
+        print("  Пробуем альтернативный метод...")
+        try:
+            # Альтернативный метод: получаем все id и удаляем батчами
+            existing = supabase.table('teachers').select('id').execute()
+            if existing.data:
+                ids_to_delete = [item['id'] for item in existing.data]
+                # Удаляем батчами по 100
+                for i in range(0, len(ids_to_delete), 100):
+                    batch_ids = ids_to_delete[i:i+100]
+                    supabase.table('teachers').delete().in_('id', batch_ids).execute()
+                print(f"✓ Удалено {len(ids_to_delete)} записей")
+        except Exception as e2:
+            print(f"❌ Не удалось очистить таблицу: {e2}")
     
     # Загружаем преподавателей
     print("\n📥 Загрузка преподавателей в базу...")

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { BottomNav } from "@/components/BottomNav";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import MaintenanceMode from "@/components/MaintenanceMode";
 import Index from "./pages/Index.tsx";
 import WeekView from "./pages/WeekView.tsx";
 import SearchPage from "./pages/SearchPage.tsx";
@@ -23,12 +24,20 @@ import ServiceDetailPage from "./pages/ServiceDetailPage.tsx";
 
 const queryClient = new QueryClient();
 
+// Проверка режима технических работ
+const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+
 function AppContent() {
   const { profile, isAuthenticated, isOnboarded, isLoading, updateProfile, logout } = useAuth();
   const location = useLocation();
   
   // Проверяем, находимся ли мы на админской странице
   const isAdminPage = location.pathname.startsWith('/admin');
+
+  // Показываем заглушку техработ (кроме админов)
+  if (isMaintenanceMode && profile?.role !== 'admin') {
+    return <MaintenanceMode />;
+  }
 
   if (isLoading) {
     return (

@@ -85,6 +85,8 @@ export default function AdminSchedulePage() {
     time_start: '09:40',
     time_end: '11:10',
     week_type: 'Чет',
+    start_date: '',
+    end_date: '',
   });
   
   // Для добавления занятий с вариантами подгрупп
@@ -98,6 +100,8 @@ export default function AdminSchedulePage() {
     time_start: '09:40',
     time_end: '11:10',
     week_type: weekType === 'even' ? 'Чет' : 'Неч',
+    start_date: '',
+    end_date: '',
   });
 
   useEffect(() => {
@@ -178,6 +182,8 @@ export default function AdminSchedulePage() {
       time_start: lesson.time_start,
       time_end: lesson.time_end,
       week_type: firstRaw.week_type,
+      start_date: firstRaw.start_date || '',
+      end_date: firstRaw.end_date || '',
     });
     
     // Если есть варианты подгрупп, загружаем их
@@ -222,6 +228,8 @@ export default function AdminSchedulePage() {
       time_start: defaultTime.start,
       time_end: defaultTime.end,
       week_type: dbWeekType,
+      start_date: '',
+      end_date: '',
     });
     
     setIsAddDialogOpen(true);
@@ -338,6 +346,8 @@ export default function AdminSchedulePage() {
       week_type: editingCommonData.week_type,
       subgroup: variant.subgroup,
       semester: firstRaw.semester,
+      start_date: editingCommonData.start_date || null,
+      end_date: editingCommonData.end_date || null,
     }));
 
     const { data: insertedLessons, error: insertError } = await supabase
@@ -471,6 +481,8 @@ export default function AdminSchedulePage() {
       week_type: commonLessonData.week_type,
       subgroup: variant.subgroup,
       semester: 'Весенний',
+      start_date: commonLessonData.start_date || null,
+      end_date: commonLessonData.end_date || null,
     }));
 
     const { data: insertedLessons, error: insertError } = await supabase
@@ -737,6 +749,26 @@ export default function AdminSchedulePage() {
                       />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Дата начала (необязательно)</Label>
+                      <Input
+                        type="date"
+                        value={editingCommonData.start_date}
+                        onChange={(e) => setEditingCommonData({ ...editingCommonData, start_date: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Дата окончания (необязательно)</Label>
+                      <Input
+                        type="date"
+                        value={editingCommonData.end_date}
+                        onChange={(e) => setEditingCommonData({ ...editingCommonData, end_date: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Варианты */}
@@ -968,6 +1000,26 @@ export default function AdminSchedulePage() {
                       type="time"
                       value={commonLessonData.time_end}
                       onChange={(e) => setCommonLessonData({ ...commonLessonData, time_end: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Дата начала (необязательно)</Label>
+                    <Input
+                      type="date"
+                      value={commonLessonData.start_date}
+                      onChange={(e) => setCommonLessonData({ ...commonLessonData, start_date: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Дата окончания (необязательно)</Label>
+                    <Input
+                      type="date"
+                      value={commonLessonData.end_date}
+                      onChange={(e) => setCommonLessonData({ ...commonLessonData, end_date: e.target.value })}
                     />
                   </div>
                 </div>

@@ -20,6 +20,29 @@ const TYPE_LABELS: Record<string, string> = {
 
 export function AdminClassCard({ lesson, index, color, onEdit, onDelete }: AdminClassCardProps) {
   const typeLabel = TYPE_LABELS[lesson.type] || lesson.type;
+  
+  // Проверяем статус по датам
+  const firstRaw = lesson.rawLessons[0];
+  const today = new Date().toISOString().split('T')[0];
+  let dateStatus = '';
+  let dateColor = '';
+  
+  if (firstRaw.start_date && firstRaw.start_date > today) {
+    dateStatus = `С ${new Date(firstRaw.start_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
+    dateColor = 'text-blue-600 dark:text-blue-400';
+  } else if (firstRaw.end_date && firstRaw.end_date < today) {
+    dateStatus = `До ${new Date(firstRaw.end_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
+    dateColor = 'text-gray-500 dark:text-gray-400';
+  } else if (firstRaw.start_date || firstRaw.end_date) {
+    if (firstRaw.start_date && firstRaw.end_date) {
+      dateStatus = `${new Date(firstRaw.start_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })} - ${new Date(firstRaw.end_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
+    } else if (firstRaw.start_date) {
+      dateStatus = `С ${new Date(firstRaw.start_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
+    } else if (firstRaw.end_date) {
+      dateStatus = `До ${new Date(firstRaw.end_date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}`;
+    }
+    dateColor = 'text-green-600 dark:text-green-400';
+  }
 
   return (
     <motion.div
@@ -54,6 +77,11 @@ export function AdminClassCard({ lesson, index, color, onEdit, onDelete }: Admin
             <h3 className="font-semibold text-card-foreground text-[15px] leading-tight">
               {lesson.subject}
             </h3>
+            {dateStatus && (
+              <p className={`text-[10px] font-medium mt-0.5 ${dateColor}`}>
+                {dateStatus}
+              </p>
+            )}
           </div>
           <div className="text-right flex-shrink-0 ml-3">
             <p className="text-sm font-semibold text-card-foreground">

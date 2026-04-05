@@ -15,6 +15,8 @@ interface Lesson {
   subgroup: number;
   group_id: string;
   semester: string;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 interface SubgroupVariant {

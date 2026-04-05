@@ -11,7 +11,7 @@ from supabase import create_client
 
 def load_env():
     """Загружает переменные окружения из .env"""
-    env_path = Path('classmate-connect/.env')
+    env_path = Path('.env')
     env_vars = {}
     if env_path.exists():
         with open(env_path, 'r', encoding='utf-8') as f:

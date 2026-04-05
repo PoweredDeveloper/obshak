@@ -146,6 +146,7 @@ export default function Home({ user }: HomeProps) {
             cls={cls}
             index={i}
             variant={nextClass?.id === cls.id && isToday ? 'next' : 'default'}
+            dayIndex={selectedDay}
           />
         ))}
 

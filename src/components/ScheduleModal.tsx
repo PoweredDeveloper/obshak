@@ -90,6 +90,7 @@ export function ScheduleModal({ isOpen, onClose, groupId, groupName }: ScheduleM
                       cls={cls}
                       index={i}
                       variant="default"
+                      dayIndex={selectedDay}
                     />
                   ))
                 )}

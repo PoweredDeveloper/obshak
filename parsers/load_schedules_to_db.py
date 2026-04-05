@@ -8,7 +8,7 @@ from supabase import create_client
 
 def load_env():
     """Загружает переменные окружения из .env"""
-    env_path = Path('classmate-connect/.env')
+    env_path = Path('.env')
     env_vars = {}
     if env_path.exists():
         with open(env_path, 'r', encoding='utf-8') as f:
@@ -57,7 +57,9 @@ def load_lessons_to_db(supabase, lessons, group_id_map):
             'time_start': lesson['time_start'],
             'time_end': lesson['time_end'],
             'week_type': lesson['week_type'],
-            'semester': 'Весенний'  # Пока хардкодим
+            'semester': 'Весенний',  # Пока хардкодим
+            'start_date': lesson.get('start_date'),
+            'end_date': lesson.get('end_date')
         })
     
     # Загружаем батчами по 100
@@ -104,7 +106,8 @@ def main():
         print("❌ Папка schedules не найдена")
         return
     
-    docx_files = list(schedules_dir.glob('*.docx'))
+    # Получаем все .docx и .doc файлы
+    docx_files = list(schedules_dir.glob('*.docx')) + list(schedules_dir.glob('*.doc'))
     print(f"\n📂 Найдено файлов расписаний: {len(docx_files)}")
     
     # Парсим и загружаем

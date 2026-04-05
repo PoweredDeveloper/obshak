@@ -8,11 +8,11 @@ import os
 import re
 from dotenv import load_dotenv
 
-load_dotenv('classmate-connect/.env')
+load_dotenv('.env')
 
 # Подключение к Supabase
 SUPABASE_URL = "https://awswwgvlnhbtcfeexyqv.supabase.co"
-SUPABASE_KEY = os.getenv('VITE_SUPABASE_ANON_KEY')
+SUPABASE_KEY = os.getenv('VITE_SUPABASE_PUBLISHABLE_KEY')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -24,14 +24,22 @@ print("=" * 60)
 print("\n1️⃣ Обработка дат начала в названиях предметов...")
 
 date_patterns = [
-    (r'^(\d{2})\.(\d{2})\.(\d{2})\.?\s+', lambda m: f'2026-{m.group(2)}-{m.group(1)}'),
-    (r'^[Сс]\s+(\d{2})\.(\d{2})\.(\d{2})\.?\s+', lambda m: f'2026-{m.group(2)}-{m.group(1)}'),
+    # С 06.04.26. или 06.04.26. (с пробелом или без между датой и годом)
+    (r'^(\d{2})\.(\d{2})\.?\s*(\d{2})\.?\s+', lambda m: f'20{m.group(3)}-{m.group(2)}-{m.group(1)}'),
+    (r'^[Сс]\s+(\d{2})\.(\d{2})\.?\s*(\d{2})\.?\s*', lambda m: f'20{m.group(3)}-{m.group(2)}-{m.group(1)}'),
+    # С 06.04. (без года, подразумевается 2026)
+    (r'^[Сс]\s+(\d{2})\.(\d{2})\.\s+', lambda m: f'2026-{m.group(2)}-{m.group(1)}'),
+    # С 09.02 по 10.04 (берем дату начала)
+    (r'^[Сс]\s+(\d{2})\.(\d{2})\s+по\s+', lambda m: f'2026-{m.group(2)}-{m.group(1)}'),
 ]
 
 response = supabase.table('lessons').select('id, subject').execute()
 lessons = response.data
 
+print(f"   Всего занятий в БД: {len(lessons)}")
+
 updates = []
+matched_count = 0
 for lesson in lessons:
     subject = lesson['subject']
     start_date = None
@@ -40,8 +48,11 @@ for lesson in lessons:
     for pattern, date_func in date_patterns:
         match = re.match(pattern, subject)
         if match:
+            matched_count += 1
             start_date = date_func(match)
             new_subject = re.sub(pattern, '', subject).strip()
+            if matched_count <= 3:  # Показываем первые 3 совпадения
+                print(f"   Найдено: '{subject}' -> '{new_subject}' ({start_date})")
             break
     
     if start_date:
@@ -51,6 +62,7 @@ for lesson in lessons:
             'start_date': start_date
         })
 
+print(f"   Совпадений с паттернами: {matched_count}")
 print(f"   Найдено занятий с датами начала: {len(updates)}")
 
 if updates:

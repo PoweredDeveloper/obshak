@@ -146,8 +146,12 @@ export function isCurrentClass(cls: ClassSession, dayIndex?: number): boolean {
   const now = new Date();
   const todayIndex = getTodayDayIndex();
   
-  // Если передан dayIndex, проверяем что это сегодняшний день
-  if (dayIndex !== undefined && dayIndex !== todayIndex) {
+  // Всегда проверяем день недели
+  // Если dayIndex передан - используем его, иначе считаем что это сегодняшний день
+  const checkDayIndex = dayIndex !== undefined ? dayIndex : todayIndex;
+  
+  // Если это не сегодняшний день - не текущая пара
+  if (checkDayIndex !== todayIndex) {
     return false;
   }
   

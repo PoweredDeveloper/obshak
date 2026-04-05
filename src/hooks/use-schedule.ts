@@ -100,15 +100,27 @@ export function useSchedule(groupId: string | null, weekType: 'even' | 'odd') {
         // Берем занятия которые либо для конкретной недели, либо для обеих недель
         // И фильтруем по датам: показываем только если start_date <= today (или null)
         // И end_date >= today (или null)
-        const { data, error: fetchError } = await supabase
+        let query = supabase
           .from('lessons')
-          .select('id, subject, type, teacher, room, day_of_week, lesson_number, time_start, time_end, subgroup')
+          .select('id, subject, type, teacher, room, day_of_week, lesson_number, time_start, time_end, subgroup, start_date, end_date')
           .eq('group_id', groupId)
           .in('week_type', [dbWeekType, 'Обе'])
-          .or(`start_date.is.null,start_date.lte.${today}`)
-          .or(`end_date.is.null,end_date.gte.${today}`)
           .order('day_of_week')
           .order('lesson_number');
+        
+        const { data: allData, error: fetchError } = await query;
+        
+        if (fetchError) {
+          console.error('Supabase error:', fetchError);
+          throw fetchError;
+        }
+        
+        // Фильтруем на клиенте по датам (так как Supabase .or() работает не так как нужно)
+        const data = allData?.filter(lesson => {
+          const startOk = !lesson.start_date || lesson.start_date <= today;
+          const endOk = !lesson.end_date || lesson.end_date >= today;
+          return startOk && endOk;
+        });
 
         if (fetchError) {
           console.error('Supabase error:', fetchError);

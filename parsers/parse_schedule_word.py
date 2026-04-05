@@ -35,6 +35,7 @@ def parse_lesson_cell(cell_text):
     """
     Парсит ячейку с занятием
     Формат: 'Математика (Лекции) проф. Тимербаев Н.Ф. 201'
+    Может содержать даты: 'до 22.03.' или 'с 06.04.26.'
     """
     if not cell_text or cell_text.strip() == '':
         return None
@@ -48,7 +49,9 @@ def parse_lesson_cell(cell_text):
             'subject': text,
             'type': None,
             'teacher': None,
-            'room': None
+            'room': None,
+            'start_date': None,
+            'end_date': None
         }
     
     subject = match.group(1).strip()
@@ -56,6 +59,35 @@ def parse_lesson_cell(cell_text):
     
     # Остальной текст после скобок
     rest = text[match.end():].strip()
+    
+    # Извлекаем дату окончания если есть (до XX.XX.XX или до XX. XX.)
+    end_date = None
+    end_date_match = re.search(r'до\s+(\d{2})\s*\.\s*(\d{2})\s*\.?\s*(\d{2})?', rest)
+    if end_date_match:
+        day = end_date_match.group(1)
+        month = end_date_match.group(2)
+        year = end_date_match.group(3) if end_date_match.group(3) else '26'
+        end_date = f'20{year}-{month}-{day}'
+        # Убираем дату из текста
+        rest = rest[:end_date_match.start()].strip() + ' ' + rest[end_date_match.end():].strip()
+        rest = rest.strip()
+    
+    # Извлекаем дату начала если есть (С XX.XX.XX. или С XX.XX. или С XX.XX по)
+    start_date = None
+    # Паттерны для дат начала
+    start_patterns = [
+        (r'[Сс]\s+(\d{2})\.(\d{2})\.?\s*(\d{2})\.?\s*', lambda m: f'20{m.group(3)}-{m.group(2)}-{m.group(1)}'),
+        (r'[Сс]\s+(\d{2})\.(\d{2})\.\s+', lambda m: f'2026-{m.group(2)}-{m.group(1)}'),
+        (r'[Сс]\s+(\d{2})\.(\d{2})\s+по\s+', lambda m: f'2026-{m.group(2)}-{m.group(1)}'),
+    ]
+    
+    for pattern, date_func in start_patterns:
+        start_match = re.search(pattern, subject)
+        if start_match:
+            start_date = date_func(start_match)
+            # Убираем дату из названия предмета
+            subject = re.sub(pattern, '', subject).strip()
+            break
     
     # Ищем преподавателя и аудиторию
     teacher = None
@@ -71,13 +103,12 @@ def parse_lesson_cell(cell_text):
         rest = rest.strip()
     
     # Аудитория обычно в конце (цифры или буквы+цифры, может быть с корпусом типа 2-401)
-    # Но может быть перед датами типа "до 05.04.26" или "с 20.04.26"
     if not room:  # Ищем обычную аудиторию только если не нашли специальное место
-        # Ищем аудиторию перед датами или в конце
-        room_match = re.search(r'(\d+-\d+[А-Яа-я]?|\d+[А-Яа-я]?)(?:\s+(?:до|с|по)\s+\d|$)', rest)
+        # Ищем аудиторию в конце (после удаления дат)
+        room_match = re.search(r'(\d+-\d+[А-Яа-я]?|\d+[А-Яа-я]?)\s*$', rest)
         if room_match:
             room = room_match.group(1).strip()
-            # Убираем аудиторию и все что после нее (даты)
+            # Убираем аудиторию
             rest = rest[:room_match.start()].strip()
     
     # Остальное - преподаватель
@@ -88,7 +119,9 @@ def parse_lesson_cell(cell_text):
         'subject': subject,
         'type': lesson_type,
         'teacher': teacher,
-        'room': room
+        'room': room,
+        'start_date': start_date,
+        'end_date': end_date
     }
 
 def parse_schedule_docx(file_path):
@@ -123,6 +156,7 @@ def parse_schedule_docx(file_path):
     
     # Собираем информацию о группах и их колонках
     groups_dict = {}
+    
     for i, cell in enumerate(header_row.cells[4:], start=4):  # Пропускаем первые 4 колонки
         group_name = cell.text.strip()
         if group_name and re.match(r'\d{1,2}[А-ЯЁ]{2}\d{2}', group_name):
@@ -137,10 +171,15 @@ def parse_schedule_docx(file_path):
             elif 'подгруппа 2' in subgroup_text:
                 subgroup = 2
             
-            groups_dict[group_name].append({
+            # Проверяем не добавили ли мы уже эту подгруппу (для объединенных ячеек)
+            column_info = {
                 'column_index': i,
                 'subgroup': subgroup
-            })
+            }
+            
+            # Добавляем только если такой комбинации еще нет
+            if not any(c['subgroup'] == subgroup and c['column_index'] != i for c in groups_dict[group_name]):
+                groups_dict[group_name].append(column_info)
     
     print(f"📋 Найдено групп: {len(groups_dict)}")
     for group_name, columns in groups_dict.items():
@@ -213,13 +252,15 @@ def parse_schedule_docx(file_path):
                     'subject': lesson_data['subject'],
                     'type': lesson_data['type'],
                     'teacher': lesson_data['teacher'],
-                    'room': lesson_data['room']
+                    'room': lesson_data['room'],
+                    'start_date': lesson_data.get('start_date'),
+                    'end_date': lesson_data.get('end_date')
                 })
     
     return lessons
 
 def main():
-    file_path = '25SZH01_02.docx'
+    file_path = 'schedules/23PG06_09.docx'
     
     if not Path(file_path).exists():
         print(f"❌ Файл {file_path} не найден")

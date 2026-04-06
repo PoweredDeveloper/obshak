@@ -167,7 +167,7 @@ export default function Home({ user }: HomeProps) {
       {scheduleFeedbackNotification?.link && (
         <motion.button
           onClick={() => {
-            const prefilledText = `Неверное расписание\n\nГруппа: ${user.groupName}\nДень: ${dayName}\nНеделя: ${weekType === 'even' ? 'Четная' : 'Нечетная'}`;
+            const prefilledText = `${scheduleFeedbackNotification.text}\n\nГруппа: ${user.groupName}\nДень: ${dayName}\nНеделя: ${weekType === 'even' ? 'Четная' : 'Нечетная'}`;
             const encodedText = encodeURIComponent(prefilledText);
             const linkWithText = `${scheduleFeedbackNotification.link}?text=${encodedText}`;
             

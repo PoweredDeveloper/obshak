@@ -59,6 +59,9 @@ export function useSchedule(groupId: string | null, weekType: 'even' | 'odd') {
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // Определяем какую таблицу использовать (lessons или lessons_test)
+  const tableName = import.meta.env.VITE_TEST_MODE === 'true' ? 'lessons_test' : 'lessons';
+
   // Функция для принудительного обновления расписания
   const refresh = useCallback(() => {
     setRefreshKey(prev => prev + 1);
@@ -101,7 +104,7 @@ export function useSchedule(groupId: string | null, weekType: 'even' | 'odd') {
         // И фильтруем по датам: показываем только если start_date <= today (или null)
         // И end_date >= today (или null)
         let query = supabase
-          .from('lessons')
+          .from(tableName)
           .select('id, subject, type, teacher, room, day_of_week, lesson_number, time_start, time_end, subgroup, start_date, end_date')
           .eq('group_id', groupId)
           .in('week_type', [dbWeekType, 'Обе'])
@@ -267,17 +270,17 @@ export function useSchedule(groupId: string | null, weekType: 'even' | 'odd') {
 
     fetchSchedule();
 
-    // Подписываемся на изменения в таблице lessons для этой группы
+    // Подписываемся на изменения в таблице lessons/lessons_test для этой группы
     if (!groupId) return;
 
     const channel = supabase
-      .channel(`lessons-${groupId}`)
+      .channel(`${tableName}-${groupId}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'lessons',
+          table: tableName,
           filter: `group_id=eq.${groupId}`,
         },
         () => {

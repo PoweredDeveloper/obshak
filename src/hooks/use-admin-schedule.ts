@@ -48,6 +48,9 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
   const [groupedLessons, setGroupedLessons] = useState<GroupedLesson[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Определяем какую таблицу использовать (lessons или lessons_test)
+  const tableName = import.meta.env.VITE_TEST_MODE === 'true' ? 'lessons_test' : 'lessons';
+
   useEffect(() => {
     if (!groupId) {
       setLessons([]);
@@ -65,7 +68,7 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
     const dbWeekType = weekType === 'even' ? 'Чет' : 'Неч';
     
     const { data, error } = await supabase
-      .from('lessons')
+      .from(tableName)
       .select('*')
       .eq('group_id', groupId)
       .in('week_type', [dbWeekType, 'Обе'])

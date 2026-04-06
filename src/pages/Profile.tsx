@@ -131,6 +131,19 @@ export default function Profile({ user, onChangeGroup, onLogout }: ProfileProps)
             <span className="text-sm font-medium text-primary">Сменить группу</span>
             <ChevronRight className="w-5 h-5 text-primary" />
           </motion.button>
+
+          <motion.button
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: isAdmin ? 0.35 : 0.3 }}
+            onClick={onLogout}
+            className="w-full schedule-card flex items-center justify-between"
+          >
+            <span className="text-sm font-medium text-destructive flex items-center gap-2">
+              <LogOut className="w-4 h-4" /> Сбросить профиль
+            </span>
+            <ChevronRight className="w-5 h-5 text-destructive" />
+          </motion.button>
         </div>
       </div>
     </div>

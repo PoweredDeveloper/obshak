@@ -80,16 +80,24 @@ export function useTeachers(params: TeachersParams) {
 
         teachersWithRatings = teachers.map(teacher => ({
           ...teacher,
-          average_rating: parseFloat(teacher.average_rating as any) || 0,
-          ratings_count: parseInt(teacher.ratings_count as any) || 0,
+          average_rating: typeof teacher.average_rating === 'string'
+            ? parseFloat(teacher.average_rating)
+            : (teacher.average_rating ?? 0),
+          ratings_count: typeof teacher.ratings_count === 'string'
+            ? parseInt(teacher.ratings_count, 10)
+            : (teacher.ratings_count ?? 0),
           user_rating: userRatingsMap[teacher.id] || null,
         }));
       } else {
-        teachersWithRatings = teachers.map(t => ({ 
-          ...t, 
-          average_rating: parseFloat(t.average_rating as any) || 0,
-          ratings_count: parseInt(t.ratings_count as any) || 0,
-          user_rating: null 
+        teachersWithRatings = teachers.map(t => ({
+          ...t,
+          average_rating: typeof t.average_rating === 'string'
+            ? parseFloat(t.average_rating)
+            : (t.average_rating ?? 0),
+          ratings_count: typeof t.ratings_count === 'string'
+            ? parseInt(t.ratings_count, 10)
+            : (t.ratings_count ?? 0),
+          user_rating: null
         }));
       }
 

@@ -15,6 +15,11 @@ export interface FavoriteGroup {
 const favoritesCache = new Map<string, { favorites: FavoriteGroup[]; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 минут
 
+// Функция для очистки кэша (экспортируем для использования при logout)
+export function clearFavoritesCache() {
+  favoritesCache.clear();
+}
+
 export function useFavoriteGroups() {
   const { profile } = useAuth();
   const [favorites, setFavorites] = useState<FavoriteGroup[]>([]);

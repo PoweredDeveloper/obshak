@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { MapPin, User, Edit, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getContrastColor } from '@/lib/utils';
+import { formatScheduleTime } from '@/lib/schedule-data';
 import type { GroupedLesson } from '@/hooks/use-admin-schedule';
 
 interface AdminClassCardProps {
@@ -85,10 +86,10 @@ export function AdminClassCard({ lesson, index, color, onEdit, onDelete }: Admin
           </div>
           <div className="text-right flex-shrink-0 ml-3">
             <p className="text-sm font-semibold text-card-foreground">
-              {lesson.time_start.slice(0, 5)}
+              {formatScheduleTime(lesson.time_start)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {lesson.time_end.slice(0, 5)}
+              {formatScheduleTime(lesson.time_end)}
             </p>
           </div>
         </div>

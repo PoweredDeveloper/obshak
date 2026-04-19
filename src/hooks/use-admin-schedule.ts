@@ -47,6 +47,7 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [groupedLessons, setGroupedLessons] = useState<GroupedLesson[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Определяем какую таблицу использовать (lessons или lessons_test)
   const tableName = import.meta.env.VITE_TEST_MODE === 'true' ? 'lessons_test' : 'lessons';
@@ -55,19 +56,21 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
     if (!groupId) {
       setLessons([]);
       setGroupedLessons([]);
+      setError(null);
       return;
     }
 
     loadLessons();
-  }, [groupId, weekType]);
+  }, [groupId, weekType, tableName]);
 
   async function loadLessons() {
     if (!groupId) return;
 
     setLoading(true);
+    setError(null);
     const dbWeekType = weekType === 'even' ? 'Чет' : 'Неч';
-    
-    const { data, error } = await supabase
+
+    const { data, error: fetchError } = await supabase
       .from(tableName)
       .select('*')
       .eq('group_id', groupId)
@@ -75,8 +78,9 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
       .order('day_of_week')
       .order('lesson_number');
 
-    if (error) {
-      console.error('Error loading lessons:', error);
+    if (fetchError) {
+      console.error('Error loading lessons:', fetchError);
+      setError(fetchError.message);
       setLoading(false);
       return;
     }
@@ -189,6 +193,7 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
     lessons,
     groupedLessons,
     loading,
+    error,
     refresh,
   };
 }

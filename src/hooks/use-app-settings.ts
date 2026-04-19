@@ -1,6 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+interface AppSetting {
+  key: string;
+  value: string | number | boolean | null;
+}
+
+interface AppSettings {
+  [key: string]: string | number | boolean | null;
+}
+
 /**
  * Хук для получения глобальных настроек приложения
  * Кеширование на 5 минут для оптимизации (1000+ пользователей)
@@ -8,16 +17,16 @@ import { supabase } from '@/integrations/supabase/client';
 export function useAppSettings() {
   return useQuery({
     queryKey: ['app-settings'],
-    queryFn: async () => {
+    queryFn: async (): Promise<AppSettings> => {
       const { data, error } = await supabase
-        .from('app_settings' as any)
+        .from('app_settings')
         .select('key, value')
-        .order('key');
+        .order('key') as { data: AppSetting[] | null; error: Error | null };
 
       if (error) throw error;
 
       // Преобразуем в объект для удобного доступа
-      const settings: Record<string, any> = {};
+      const settings: AppSettings = {};
       data?.forEach((setting) => {
         settings[setting.key] = setting.value;
       });
@@ -37,9 +46,9 @@ export function useAppSettings() {
  */
 export function useFeatureFlag(flagKey: string): boolean {
   const { data: settings, isLoading } = useAppSettings();
-  
+
   // Пока загружается, возвращаем false (фича выключена по умолчанию)
-  if (isLoading) return false;
-  
-  return settings?.[flagKey] === true;
+  if (isLoading || !settings) return false;
+
+  return settings[flagKey] === true || settings[flagKey] === 'true';
 }

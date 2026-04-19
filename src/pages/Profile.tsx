@@ -4,6 +4,7 @@ import { User, GraduationCap, Building2, BookOpen, ChevronRight, LogOut, Setting
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { UserProfile } from '@/lib/user-store';
 import { useAuth } from '@/contexts/AuthContext';
+import { parseSafeTelegramHttpsUrl } from '@/lib/utils';
 
 interface ProfileProps {
   user: UserProfile;
@@ -102,10 +103,13 @@ export default function Profile({ user, onChangeGroup, onLogout }: ProfileProps)
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: isAdmin ? 0.25 : 0.2 }}
               onClick={() => {
+                const safe = parseSafeTelegramHttpsUrl(bugReportNotification.link!);
+                if (!safe) return;
+                const href = safe.toString();
                 if (window.Telegram?.WebApp) {
-                  window.Telegram.WebApp.openTelegramLink(bugReportNotification.link!);
+                  window.Telegram.WebApp.openTelegramLink(href);
                 } else {
-                  window.open(bugReportNotification.link!, '_blank');
+                  window.open(href, '_blank', 'noopener,noreferrer');
                 }
               }}
               className="w-full schedule-card flex items-center justify-between"

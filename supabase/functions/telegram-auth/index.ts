@@ -1,9 +1,30 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+function getAllowedOrigins(): string[] {
+  const envOrigins = Deno.env.get('ALLOWED_ORIGINS');
+  if (envOrigins) {
+    try {
+      return JSON.parse(envOrigins);
+    } catch {
+      return envOrigins.split(',').map(s => s.trim()).filter(Boolean);
+    }
+  }
+  return [
+    'https://awswwgvlnhbtcfeexyqv.supabase.co',
+    'http://localhost:5173',
+    'http://localhost:8080',
+    'http://localhost:3000',
+  ];
+}
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigins = getAllowedOrigins();
+  const allowedOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  };
+}
 
 async function validateInitData(initData: string, botToken: string): Promise<Record<string, string>> {
   const params = new URLSearchParams(initData);
@@ -50,7 +71,26 @@ async function validateInitData(initData: string, botToken: string): Promise<Rec
   return result;
 }
 
+/** Find user by email with pagination */
+async function findAuthUserIdByEmail(
+  supabase: ReturnType<typeof createClient>,
+  email: string,
+): Promise<string | undefined> {
+  const perPage = 1000;
+  for (let page = 1; page <= 100; page++) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const found = data.users.find((u) => u.email === email);
+    if (found) return found.id;
+    if (data.users.length < perPage) return undefined;
+  }
+  return undefined;
+}
+
 Deno.serve(async (req) => {
+  const origin = req.headers.get('Origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -98,14 +138,12 @@ Deno.serve(async (req) => {
     // Deterministic email from telegram_id
     const email = `tg_${telegramId}@telegram.internal`;
 
-    // Check if auth user exists
-    const { data: existingUsers } = await supabase.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === email);
+    const existingId = await findAuthUserIdByEmail(supabase, email);
 
     let userId: string;
 
-    if (existingUser) {
-      userId = existingUser.id;
+    if (existingId) {
+      userId = existingId;
     } else {
       const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
         email,
@@ -156,9 +194,8 @@ Deno.serve(async (req) => {
     );
   } catch (error: unknown) {
     console.error('Telegram auth error:', error);
-    const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: 'Authentication failed' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

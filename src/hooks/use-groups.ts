@@ -2,6 +2,19 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Group } from '@/lib/schedule-data';
 
+interface GroupQueryResult {
+  id: string;
+  name: string;
+  course: number | null;
+  form: string | null;
+  directions: {
+    name: string;
+    institutes: {
+      name: string;
+    };
+  } | null;
+}
+
 // Кеш для групп (в памяти приложения)
 let cachedGroups: Group[] | null = null;
 let cacheTimestamp: number | null = null;
@@ -59,10 +72,10 @@ export function useGroups() {
         }
 
         // Преобразуем данные в нужный формат
-        const formattedGroups: Group[] = (data || []).map((g: any) => {
+        const formattedGroups: Group[] = (data || []).map((g: GroupQueryResult) => {
           // Вычисляем семестр на основе курса (примерно)
           const semester = g.course ? g.course * 2 : 1;
-          
+
           return {
             id: g.id,
             name: g.name,

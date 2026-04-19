@@ -13,6 +13,7 @@ import {
   getNextClass,
   getDaySummaryEmoji,
 } from '@/lib/schedule-data';
+import { safeTelegramLinkWithPrefilledText } from '@/lib/utils';
 import type { UserProfile } from '@/lib/user-store';
 
 interface HomeProps {
@@ -168,13 +169,16 @@ export default function Home({ user }: HomeProps) {
         <motion.button
           onClick={() => {
             const prefilledText = `${scheduleFeedbackNotification.text}\n\nГруппа: ${user.groupName}\nДень: ${dayName}\nНеделя: ${weekType === 'even' ? 'Четная' : 'Нечетная'}`;
-            const encodedText = encodeURIComponent(prefilledText);
-            const linkWithText = `${scheduleFeedbackNotification.link}?text=${encodedText}`;
-            
+            const linkWithText = safeTelegramLinkWithPrefilledText(
+              scheduleFeedbackNotification.link,
+              prefilledText
+            );
+            if (!linkWithText) return;
+
             if (window.Telegram?.WebApp) {
               window.Telegram.WebApp.openTelegramLink(linkWithText);
             } else {
-              window.open(linkWithText, '_blank');
+              window.open(linkWithText, '_blank', 'noopener,noreferrer');
             }
           }}
           initial={{ opacity: 0, scale: 0.8 }}

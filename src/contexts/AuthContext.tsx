@@ -9,6 +9,8 @@ import {
 } from '@/lib/telegram-auth';
 import { initActivityTracking } from '@/lib/activity-tracker';
 import { clearGroupsCache } from '@/hooks/use-groups';
+import { clearScheduleCache } from '@/hooks/use-schedule';
+import { clearFavoritesCache } from '@/hooks/use-favorite-groups';
 
 interface Notification {
   key: string;
@@ -258,7 +260,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setProfile(null);
     setError(null);
-    clearGroupsCache(); // Очищаем кеш групп при выходе
+    // Clear all caches on logout
+    clearGroupsCache();
+    clearScheduleCache();
+    clearFavoritesCache();
   }, []);
 
   const updateProfileFn = useCallback(async (updates: Partial<DbProfile>) => {

@@ -13,6 +13,7 @@ interface UserStats {
 export function useUsersStats() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadStats();
@@ -90,12 +91,14 @@ export function useUsersStats() {
         byInstitute,
         byGroup,
       });
-    } catch (error) {
-      console.error('Error loading stats:', error);
+      setError(null);
+    } catch (err) {
+      console.error('Error loading stats:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load statistics');
     } finally {
       setLoading(false);
     }
   }
 
-  return { stats, loading, refresh: loadStats };
+  return { stats, loading, error, refresh: loadStats };
 }

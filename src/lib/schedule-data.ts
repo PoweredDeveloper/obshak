@@ -137,9 +137,31 @@ export function getTodayDayIndex(): number {
   return day === 0 ? 6 : day - 1;
 }
 
-export function parseTime(time: string): { hours: number; minutes: number } {
-  const [hours, minutes] = time.split(':').map(Number);
+export function parseTime(time: string): { hours: number; minutes: number } | null {
+  if (!time || time === '—') return null;
+  const m = String(time).trim().match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return null;
+  const hours = Number(m[1]);
+  const minutes = Number(m[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes) || hours > 23 || minutes > 59) {
+    return null;
+  }
   return { hours, minutes };
+}
+
+/** Нормализует время из БД (HH:MM:SS, ISO и т.д.) в HH:MM для UI. */
+export function formatScheduleTime(value: string | null | undefined): string {
+  if (value == null || String(value).trim() === '') return '—';
+  const s = String(value).trim();
+  if (s.includes('T')) {
+    const d = new Date(s);
+    if (!Number.isNaN(d.getTime())) {
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+  }
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (m) return `${m[1].padStart(2, '0')}:${m[2]}`;
+  return '—';
 }
 
 export function isCurrentClass(cls: ClassSession, dayIndex?: number): boolean {
@@ -157,6 +179,7 @@ export function isCurrentClass(cls: ClassSession, dayIndex?: number): boolean {
   
   const start = parseTime(cls.startTime);
   const end = parseTime(cls.endTime);
+  if (!start || !end) return false;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const startMinutes = start.hours * 60 + start.minutes;
   const endMinutes = end.hours * 60 + end.minutes;
@@ -168,6 +191,7 @@ export function getNextClass(classes: ClassSession[]): ClassSession | null {
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   for (const cls of classes) {
     const start = parseTime(cls.startTime);
+    if (!start) continue;
     const startMinutes = start.hours * 60 + start.minutes;
     if (startMinutes > nowMinutes) return cls;
   }
@@ -177,6 +201,7 @@ export function getNextClass(classes: ClassSession[]): ClassSession | null {
 export function getTimeLeftMinutes(endTime: string): number {
   const now = new Date();
   const end = parseTime(endTime);
+  if (!end) return 0;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const endMinutes = end.hours * 60 + end.minutes;
   return Math.max(0, endMinutes - nowMinutes);
@@ -186,6 +211,7 @@ export function getClassProgress(cls: ClassSession): number {
   const now = new Date();
   const start = parseTime(cls.startTime);
   const end = parseTime(cls.endTime);
+  if (!start || !end) return 0;
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const startMinutes = start.hours * 60 + start.minutes;
   const endMinutes = end.hours * 60 + end.minutes;

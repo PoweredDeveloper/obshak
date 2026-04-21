@@ -1,3 +1,5 @@
-obshak.online {
+obshak.space {
+	@telegram path /telegram-webhook*
+	reverse_proxy @telegram telegram-bot:8080
 	reverse_proxy app:80
 }

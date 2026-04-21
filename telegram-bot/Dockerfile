@@ -2,15 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy bot files
-COPY bot.py image.png* ./
+COPY bot_webhook_server.py .
 
-# Environment variables
 ENV BOT_TOKEN=""
 ENV MINI_APP_URL=""
+ENV WEBHOOK_PATH="/telegram-webhook"
+ENV PORT=8080
 
-CMD ["python", "bot.py"]
+CMD ["python", "bot_webhook_server.py"]

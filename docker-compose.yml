@@ -30,7 +30,11 @@ services:
     environment:
       BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       MINI_APP_URL: ${MINI_APP_URL}
+      WEBHOOK_PATH: /telegram-webhook
+      BASE_URL: ${BASE_URL:-https://obshak.online}
     restart: unless-stopped
+    depends_on:
+      - caddy
 
 volumes:
   caddy_data:

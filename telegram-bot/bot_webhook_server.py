@@ -1,35 +1,32 @@
 """
-Telegram bot with webhook server (for Russia - bypasses API block)
-Telegram calls us, we don't call Telegram API
+Telegram webhook server - receives updates, never calls Telegram API
+Works in Russia where api.telegram.org is blocked
 """
 import os
 import asyncio
+import json
 from aiohttp import web
-from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 MINI_APP_URL = os.environ.get('MINI_APP_URL')
 WEBHOOK_PATH = os.environ.get('WEBHOOK_PATH', '/telegram-webhook')
 PORT = int(os.environ.get('PORT', 8080))
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
+async def handle_start(payload):
+    """Handle /start command"""
+    chat_id = payload.get('message', {}).get('chat', {}).get('id')
+    user = payload.get('message', {}).get('from', {})
+    first_name = user.get('first_name', 'друг')
 
-    keyboard = [
-        [InlineKeyboardButton(
-            text="🎓 Открыть Obshak",
-            web_app=WebAppInfo(url=MINI_APP_URL)
-        )],
-        [InlineKeyboardButton(
-            text="📱 Как добавить на главный экран?",
-            callback_data="help_home_screen"
-        )]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = {
+        "inline_keyboard": [
+            [{"text": "🎓 Открыть Obshak", "web_app": {"url": MINI_APP_URL}}],
+            [{"text": "📱 Как добавить на главный экран?", "callback_data": "help_home_screen"}]
+        ]
+    }
 
     message = (
-        f"👋 Привет, {user.first_name}!\n\n"
+        f"👋 Привет, {first_name}!\n\n"
         f"🎓 Добро пожаловать в Obshak — платформу для студентов КГАСУ!\n\n"
         f"⚠️ *Сейчас идет бета-тестирование*\n"
         f"Если приложение не загружается, попробуй включить VPN.\n"
@@ -42,15 +39,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Нажми на кнопку ниже, чтобы начать! 👇"
     )
 
-    await update.message.reply_text(
-        message,
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
+    return {
+        "method": "sendMessage",
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "Markdown",
+        "reply_markup": keyboard
+    }
 
-async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+async def handle_help_callback(payload):
+    """Handle help callback"""
+    callback_id = payload.get('callback_query', {}).get('id')
+    chat_id = payload.get('callback_query', {}).get('message', {}).get('chat', {}).get('id')
 
     help_text = (
         "📱 *Как добавить Obshak на главный экран*\n\n"
@@ -67,24 +67,48 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "💡 После добавления приложение будет открываться мгновенно!"
     )
 
-    await query.message.reply_text(
-        help_text,
-        parse_mode='Markdown'
-    )
+    return {
+        "method": "sendMessage",
+        "chat_id": chat_id,
+        "text": help_text,
+        "parse_mode": "Markdown"
+    }
+
+async def process_update(payload):
+    """Process incoming update and return response"""
+    # Check for callback query
+    if 'callback_query' in payload:
+        data = payload['callback_query'].get('data', '')
+        if data == 'help_home_screen':
+            return await handle_help_callback(payload)
+
+    # Check for /start command
+    if 'message' in payload:
+        text = payload['message'].get('text', '')
+        if text == '/start' or text.startswith('/start '):
+            return await handle_start(payload)
+
+    return None
+
+async def webhook_handler(request):
+    """Handle incoming webhook from Telegram"""
+    try:
+        payload = await request.json()
+        print(f"📥 Received update: {json.dumps(payload, indent=2)[:500]}")
+
+        response = await process_update(payload)
+
+        if response:
+            # Return response that Telegram will execute
+            return web.json_response(response)
+        else:
+            return web.json_response({"ok": True})
+
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        return web.json_response({"ok": False, "error": str(e)}, status=200)
 
 async def main():
-    application = Application.builder().token(BOT_TOKEN).build()
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(help_callback, pattern="help_home_screen"))
-
-    await application.initialize()
-
-    async def webhook_handler(request):
-        data = await request.json()
-        update = Update.de_json(data, application.bot)
-        await application.process_update(update)
-        return web.Response(status=200)
-
     app = web.Application()
     app.router.add_post(WEBHOOK_PATH, webhook_handler)
 
@@ -97,6 +121,10 @@ async def main():
     print(f"🤖 Webhook server running on port {PORT}")
     print(f"📍 Webhook path: {WEBHOOK_PATH}")
     print(f"⏳ Waiting for incoming webhooks from Telegram...")
+    print(f"⚠️  Remember to set webhook manually:")
+    print(f"   curl -X POST 'https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook'")
+    print(f"   -H 'Content-Type: application/json'")
+    print(f"   -d '{{\"url\": \"https://obshak.space/telegram-webhook\"}}'")
 
     await asyncio.Event().wait()
 

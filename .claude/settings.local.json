@@ -3,7 +3,9 @@
     "allow": [
       "Bash(pnpm install:*)",
       "Bash(pnpm run:*)",
-      "Bash(docker build:*)"
+      "Bash(docker build:*)",
+      "Bash(ls -la /Users/mikis/obshak/.env*)",
+      "Bash(docker-compose build:*)"
     ]
   }
 }

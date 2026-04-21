@@ -1,6 +1,37 @@
 services:
-  app:
-    build: .
+  caddy:
+    image: caddy:alpine
     ports:
-      - "3000:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
     restart: unless-stopped
+    depends_on:
+      - app
+
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_TELEGRAM_BOT_USERNAME: ${VITE_TELEGRAM_BOT_USERNAME}
+        VITE_MAINTENANCE_MODE: ${VITE_MAINTENANCE_MODE:-false}
+        VITE_TEST_MODE: ${VITE_TEST_MODE:-false}
+    restart: unless-stopped
+
+  telegram-bot:
+    build:
+      context: ./telegram-bot
+    environment:
+      BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      MINI_APP_URL: ${MINI_APP_URL}
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

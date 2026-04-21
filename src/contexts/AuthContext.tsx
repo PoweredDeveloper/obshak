@@ -2,10 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { supabase } from '@/integrations/supabase/client';
 import {
   type DbProfile,
+  type TelegramLoginWidgetUser,
   authenticateWithTelegram,
+  authenticateWithLoginWidget,
   updateProfile as updateProfileApi,
   fetchProfile,
   getTelegramInitData,
+  isTelegramWebApp,
 } from '@/lib/telegram-auth';
 import { initActivityTracking } from '@/lib/activity-tracker';
 import { clearGroupsCache } from '@/hooks/use-groups';
@@ -24,7 +27,9 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isOnboarded: boolean;
+  isWebApp: boolean;
   login: () => Promise<void>;
+  loginWithWidget: (userData: TelegramLoginWidgetUser) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<DbProfile>) => Promise<void>;
   error: string | null;
@@ -44,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Record<string, Notification>>({});
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isWebApp] = useState(() => isTelegramWebApp());
 
   const login = useCallback(async () => {
     setIsLoading(true);
@@ -57,6 +63,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const nextProfile = await authenticateWithTelegram(initData);
       setProfile(nextProfile);
+    } catch (error) {
+      setProfile(null);
+      setError(getErrorMessage(error));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loginWithWidget = useCallback(async (userData: TelegramLoginWidgetUser) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const nextProfile = await authenticateWithLoginWidget(userData);
+      setProfile(nextProfile);
+      initActivityTracking();
     } catch (error) {
       setProfile(null);
       setError(getErrorMessage(error));
@@ -163,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setProfile(nextProfile);
         setError(nextProfile ? null : 'Профиль не найден');
-        
+
         // Обновляем активность при успешной загрузке профиля
         if (nextProfile) {
           initActivityTracking();
@@ -192,31 +214,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const initData = getTelegramInitData();
-        if (!initData) {
-          finishLoading();
-          return;
-        }
+        // Only auto-authenticate if running inside Telegram Mini App
+        if (isWebApp) {
+          const initData = getTelegramInitData();
+          if (initData) {
+            try {
+              const nextProfile = await authenticateWithTelegram(initData);
+              if (!isActive) return;
 
-        try {
-          const nextProfile = await authenticateWithTelegram(initData);
-          if (!isActive) return;
+              setProfile(nextProfile);
+              setError(null);
 
-          setProfile(nextProfile);
-          setError(null);
-          
-          // Обновляем активность при успешной аутентификации
-          if (nextProfile) {
-            initActivityTracking();
+              // Обновляем активность при успешной аутентификации
+              if (nextProfile) {
+                initActivityTracking();
+              }
+            } catch (error) {
+              if (!isActive) return;
+
+              setProfile(null);
+              setError(getErrorMessage(error));
+            } finally {
+              finishLoading();
+              return;
+            }
           }
-        } catch (error) {
-          if (!isActive) return;
-
-          setProfile(null);
-          setError(getErrorMessage(error));
-        } finally {
-          finishLoading();
         }
+
+        // For website, just finish loading - user needs to click Login Widget
+        finishLoading();
       } catch (error) {
         if (!isActive) return;
 
@@ -254,7 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isActive = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [isWebApp]);
 
   const logout = useCallback(async () => {
     await supabase.auth.signOut();
@@ -279,7 +305,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!profile,
         isOnboarded: !!profile?.onboarded,
+        isWebApp,
         login,
+        loginWithWidget,
         logout,
         updateProfile: updateProfileFn,
         error,

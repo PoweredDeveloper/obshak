@@ -35,7 +35,7 @@ function AppContent() {
   const isAdminPage = location.pathname.startsWith('/admin');
 
   // Показываем заглушку техработ (кроме админов)
-  if (isMaintenanceMode && profile?.role !== 'admin') {
+  if (isMaintenanceMode && !isAdmin) {
     return <MaintenanceMode />;
   }
 

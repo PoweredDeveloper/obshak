@@ -17,14 +17,72 @@ export interface DbProfile {
   updated_at: string;
 }
 
-export function getTelegramInitData(): string | null {
-  const tg = (window as typeof window & { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp;
-  return tg?.initData || null;
+export interface TelegramLoginWidgetUser {
+  id: number;
+  first_name: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
 }
 
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp?: {
+        initData?: string;
+        ready?: () => void;
+        expand?: () => void;
+      };
+    };
+    onTelegramAuth?: (user: TelegramLoginWidgetUser) => void;
+  }
+}
+
+/**
+ * Check if running inside Telegram Mini App
+ */
+export function isTelegramWebApp(): boolean {
+  return !!(window.Telegram?.WebApp?.initData);
+}
+
+/**
+ * Get Telegram Mini App initData if available
+ */
+export function getTelegramInitData(): string | null {
+  return window.Telegram?.WebApp?.initData || null;
+}
+
+/**
+ * Authenticate using Telegram Mini App initData
+ */
 export async function authenticateWithTelegram(initData: string): Promise<DbProfile> {
   const { data, error } = await supabase.functions.invoke('telegram-auth', {
     body: { initData },
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data?.token_hash || !data?.email) throw new Error('Authentication failed');
+
+  const profile = data.profile as DbProfile;
+
+  const { error: otpError } = await supabase.auth.verifyOtp({
+    token_hash: data.token_hash,
+    type: 'magiclink',
+  });
+
+  if (otpError) throw new Error(`Session error: ${otpError.message}`);
+
+  return profile;
+}
+
+/**
+ * Authenticate using Telegram Login Widget callback data
+ */
+export async function authenticateWithLoginWidget(userData: TelegramLoginWidgetUser): Promise<DbProfile> {
+  const { data, error } = await supabase.functions.invoke('telegram-auth', {
+    body: { loginWidgetData: userData },
   });
 
   if (error) throw new Error(error.message);

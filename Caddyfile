@@ -1,0 +1,3 @@
+obshak.online {
+	reverse_proxy app:80
+}

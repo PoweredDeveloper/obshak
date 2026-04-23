@@ -49,8 +49,9 @@ services:
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-      - caddy_config:/config
+      # Bind mounts: survive `docker compose down -v` (named volumes would be removed)
+      - ./data/caddy-data:/data
+      - ./data/caddy-config:/config
     restart: unless-stopped
     depends_on:
       - app
@@ -80,6 +81,4 @@ services:
       - caddy
 
 volumes:
-  caddy_data:
-  caddy_config:
   obshak_pgdata:

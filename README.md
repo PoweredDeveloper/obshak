@@ -30,7 +30,13 @@ A record: obshak.online -> your VDS IP
 
 # 5. Start everything
 
+```bash
 docker compose up -d --build
+```
+
+Caddy TLS material lives under **`./data/caddy-data/`** and **`./data/caddy-config/`** (bind mounts). **`docker compose down -v` still removes the Postgres volume** (`obshak_pgdata`); it does **not** delete those directories, so certificates are kept unless you remove `data/` yourself. To stop without dropping volumes: `docker compose down` (no `-v`).
+
+**Migrating from old compose:** copy certs out of the old `caddy_data` volume if needed, or let Caddy re-issue after rate limits clear.
 
 Required .env values:
 

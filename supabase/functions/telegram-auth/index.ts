@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+1import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 function getAllowedOrigins(): string[] {
   const envOrigins = Deno.env.get('ALLOWED_ORIGINS');

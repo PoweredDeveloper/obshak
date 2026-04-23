@@ -1,3 +1,10 @@
+{
+	# Avoid ERR_QUIC_PROTOCOL_ERROR when UDP/443 is filtered or QUIC is flaky (browser uses HTTP/2).
+	servers {
+		protocols h1 h2
+	}
+}
+
 obshak.space {
 	@telegram path /telegram-webhook*
 	handle @telegram {

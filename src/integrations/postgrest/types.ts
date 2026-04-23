@@ -295,6 +295,74 @@ export type Database = {
           },
         ]
       }
+      lessons_test: {
+        Row: {
+          created_at: string | null
+          day_of_week: number | null
+          end_date: string | null
+          group_id: string
+          id: number
+          lesson_number: number | null
+          room: string | null
+          semester: string | null
+          start_date: string | null
+          subgroup: number | null
+          subject: string
+          teacher: string | null
+          time_end: string
+          time_start: string
+          type: string | null
+          updated_at: string | null
+          week_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week?: number | null
+          end_date?: string | null
+          group_id: string
+          id?: number
+          lesson_number?: number | null
+          room?: string | null
+          semester?: string | null
+          start_date?: string | null
+          subgroup?: number | null
+          subject: string
+          teacher?: string | null
+          time_end: string
+          time_start: string
+          type?: string | null
+          updated_at?: string | null
+          week_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number | null
+          end_date?: string | null
+          group_id?: string
+          id?: number
+          lesson_number?: number | null
+          room?: string | null
+          semester?: string | null
+          start_date?: string | null
+          subgroup?: number | null
+          subject?: string
+          teacher?: string | null
+          time_end?: string
+          time_start?: string
+          type?: string | null
+          updated_at?: string | null
+          week_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lessons_test_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           course: number | null

@@ -34,15 +34,18 @@ docker compose up -d --build
 
 Required .env values:
 
-- VITE*SUPABASE*\* - your Supabase config
-- TELEGRAM_BOT_TOKEN - from @BotFather
-- VITE_TELEGRAM_BOT_USERNAME - your bot username
-- MINI_APP_URL="https://obshak.online" (already set in example)
+- `TELEGRAM_BOT_TOKEN` — from @BotFather
+- `VITE_TELEGRAM_BOT_USERNAME` — bot username (no @)
+- `JWT_SECRET` — at least 32 characters; must match between PostgREST and auth service (see `.env.example`)
+- `VITE_PUBLIC_API_ORIGIN` — leave empty when Caddy serves `/rest/v1` and `/auth` on the same host as the SPA
+- `MINI_APP_URL` / `BASE_URL` — your public site URL
+
+Stack: **Postgres** (data), **PostgREST** (`/rest/v1`), **auth-service** (`/auth/telegram` → JWT), **nginx** SPA, **Caddy** TLS + routing.
 
 Caddy will automatically:
 
 - Obtain SSL certificate from Let's Encrypt
 - Redirect HTTP → HTTPS
-- Route traffic to your app
+- Proxy `/rest/*` to PostgREST, `/auth/*` to auth, `/telegram-webhook*` to the bot, and everything else to the SPA
 
 Note: Make sure port 80 and 443 are open on your VDS firewall, and DNS is configured before starting (Caddy needs to verify domain ownership).

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
+import { auth } from '@/integrations/postgrest/session';
 import {
   type DbProfile,
   type TelegramLoginWidgetUser,
@@ -87,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Проверяем статус админа
+  // Проверяем статус админа (polling replaces Supabase Realtime)
   useEffect(() => {
     async function checkAdmin() {
       if (!profile?.telegram_id) {
@@ -95,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data } = await supabase
+      const { data } = await db
         .from('admins')
         .select('id')
         .eq('telegram_id', profile.telegram_id)
@@ -104,69 +105,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(!!data);
     }
 
-    checkAdmin();
-
-    // Подписываемся на изменения в таблице admins
-    const channel = supabase
-      .channel('admin-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'admins',
-        },
-        () => {
-          // Перепроверяем статус админа при изменениях
-          checkAdmin();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    void checkAdmin();
+    const id = window.setInterval(() => {
+      void checkAdmin();
+    }, 45_000);
+    return () => window.clearInterval(id);
   }, [profile?.telegram_id]);
 
-  // Загружаем уведомления один раз при старте
+  // Уведомления (polling replaces Realtime)
   useEffect(() => {
     async function loadNotifications() {
-      const { data } = await supabase
+      const { data } = await db
         .from('app_notifications')
         .select('key, enabled, text, link')
         .eq('enabled', true);
 
       if (data) {
         const notificationsMap: Record<string, Notification> = {};
-        data.forEach(notification => {
+        data.forEach((notification) => {
           notificationsMap[notification.key] = notification;
         });
         setNotifications(notificationsMap);
       }
     }
 
-    loadNotifications();
-
-    // Подписываемся на изменения уведомлений
-    const channel = supabase
-      .channel('notifications-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'app_notifications',
-        },
-        () => {
-          // Перезагружаем уведомления при любом изменении
-          loadNotifications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    void loadNotifications();
+    const id = window.setInterval(() => {
+      void loadNotifications();
+    }, 45_000);
+    return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -205,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const {
           data: { session },
-        } = await supabase.auth.getSession();
+        } = await auth.getSession();
 
         if (!isActive) return;
 
@@ -255,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = auth.onAuthStateChange((event, session) => {
       if (!isActive) return;
 
       if (event === 'SIGNED_OUT') {
@@ -283,7 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [isWebApp]);
 
   const logout = useCallback(async () => {
-    await supabase.auth.signOut();
+    await auth.signOut();
     setProfile(null);
     setError(null);
     // Clear all caches on logout

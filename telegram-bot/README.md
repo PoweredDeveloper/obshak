@@ -24,9 +24,13 @@ MINI_APP_URL=https://your-app-url.com
 
 ## Запуск
 
+Локально (polling):
+
 ```bash
 python bot.py
 ```
+
+Продакшен: образ в корневом `docker-compose.yml` поднимает **`bot_webhook_server.py`** (webhook на вашем сервере за Caddy / reverse proxy). Cloudflare Workers в репозитории не используются.
 
 ## Настройка Mini App в BotFather
 

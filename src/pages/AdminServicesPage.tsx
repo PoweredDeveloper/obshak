@@ -1,7 +1,7 @@
 import { AdminLayout } from '@/components/AdminLayout';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useServiceCategories, useAdminServices, useCreateService, useUpdateService, useDeleteService, useCreateCategory, useUpdateCategory, useDeleteCategory } from '@/hooks/use-services';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +53,7 @@ export default function AdminServicesPage() {
 
   const toggleServices = async (enabled: boolean) => {
     try {
-      const { error } = await (supabase as any)
+      const { error } = await (db as any)
         .from('app_settings')
         .update({ 
           value: enabled,

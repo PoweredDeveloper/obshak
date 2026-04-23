@@ -1,4 +1,47 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: obshak
+    volumes:
+      - obshak_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d obshak']
+      interval: 3s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  postgrest:
+    image: postgrest/postgrest:v12.2.3
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:authenticator_pass@postgres:5432/obshak
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET:-dev-change-this-secret-min-32-chars!!}
+      PGRST_SERVER_PORT: 3000
+    restart: unless-stopped
+
+  auth:
+    build:
+      context: ./auth-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/obshak
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      JWT_SECRET: ${JWT_SECRET:-dev-change-this-secret-min-32-chars!!}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      PORT: 3001
+    restart: unless-stopped
+
   caddy:
     image: caddy:alpine
     ports:
@@ -11,14 +54,14 @@ services:
     restart: unless-stopped
     depends_on:
       - app
+      - postgrest
+      - auth
 
   app:
     build:
       context: .
       args:
-        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
-        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_PUBLIC_API_ORIGIN: ${VITE_PUBLIC_API_ORIGIN:-}
         VITE_TELEGRAM_BOT_USERNAME: ${VITE_TELEGRAM_BOT_USERNAME}
         VITE_MAINTENANCE_MODE: ${VITE_MAINTENANCE_MODE:-false}
         VITE_TEST_MODE: ${VITE_TEST_MODE:-false}
@@ -39,3 +82,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  obshak_pgdata:

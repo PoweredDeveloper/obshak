@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 
 interface UserStats {
   totalUsers: number;
@@ -24,14 +24,14 @@ export function useUsersStats() {
 
     try {
       // Общее количество пользователей
-      const { count: totalUsers } = await supabase
+      const { count: totalUsers } = await db
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
       // Активные за сегодня
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const { count: activeToday } = await supabase
+      const { count: activeToday } = await db
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .gte('last_active', today.toISOString());
@@ -39,7 +39,7 @@ export function useUsersStats() {
       // Активные за неделю
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 7);
-      const { count: activeWeek } = await supabase
+      const { count: activeWeek } = await db
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .gte('last_active', weekAgo.toISOString());
@@ -47,13 +47,13 @@ export function useUsersStats() {
       // Активные за месяц
       const monthAgo = new Date();
       monthAgo.setDate(monthAgo.getDate() - 30);
-      const { count: activeMonth } = await supabase
+      const { count: activeMonth } = await db
         .from('profiles')
         .select('*', { count: 'exact', head: true })
         .gte('last_active', monthAgo.toISOString());
 
       // По институтам
-      const { data: instituteData } = await supabase
+      const { data: instituteData } = await db
         .from('profiles')
         .select('institute')
         .not('institute', 'is', null);
@@ -68,7 +68,7 @@ export function useUsersStats() {
         .sort((a, b) => b.count - a.count);
 
       // По группам (топ 10)
-      const { data: groupData } = await supabase
+      const { data: groupData } = await db
         .from('profiles')
         .select('group_name')
         .not('group_name', 'is', null);

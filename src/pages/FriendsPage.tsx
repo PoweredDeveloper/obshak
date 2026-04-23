@@ -6,7 +6,7 @@ import { ScheduleModal } from '@/components/ScheduleModal';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import { toast } from 'sonner';
 
 interface Group {
@@ -60,9 +60,9 @@ export default function FriendsPage() {
     setLoadingGroups(true);
     
     const [groupsRes, directionsRes, institutesRes] = await Promise.all([
-      supabase.from('groups').select('id, name, course, direction_id').order('name'),
-      supabase.from('directions').select('id, name, institute_id'),
-      supabase.from('institutes').select('id, name'),
+      db.from('groups').select('id, name, course, direction_id').order('name'),
+      db.from('directions').select('id, name, institute_id'),
+      db.from('institutes').select('id, name'),
     ]);
 
     if (groupsRes.data) setGroups(groupsRes.data);

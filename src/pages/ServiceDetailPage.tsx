@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Star, Loader2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import { useServiceReviews, useCreateReview, useUpdateReview, type Service, type ServiceReview } from '@/hooks/use-services';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFeatureFlag } from '@/hooks/use-app-settings';
@@ -33,7 +33,7 @@ export default function ServiceDetailPage() {
   const { data: service, isLoading: serviceLoading } = useQuery({
     queryKey: ['service', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('services')
         .select('*')
         .eq('id', id)

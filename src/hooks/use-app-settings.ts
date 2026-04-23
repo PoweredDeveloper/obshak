@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 
 interface AppSetting {
   key: string;
@@ -18,7 +18,7 @@ export function useAppSettings() {
   return useQuery({
     queryKey: ['app-settings'],
     queryFn: async (): Promise<AppSettings> => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('app_settings')
         .select('key, value')
         .order('key') as { data: AppSetting[] | null; error: Error | null };

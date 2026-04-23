@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import { toast } from 'sonner';
 import { Search, Users, TrendingUp, Calendar, MessageCircle, RefreshCw, Shield, ShieldOff, ArrowUpDown } from 'lucide-react';
 
@@ -88,7 +88,7 @@ export default function AdminUsersPage() {
   }, [currentPage, searchQuery, sortBy, selectedGroup, activeTab]);
 
   async function loadGroups() {
-    const { data } = await supabase
+    const { data } = await db
       .from('profiles')
       .select('group_name')
       .not('group_name', 'is', null)
@@ -101,7 +101,7 @@ export default function AdminUsersPage() {
   async function loadGroupStats() {
     setLoadingGroupStats(true);
 
-    const { data: allProfiles } = await supabase
+    const { data: allProfiles } = await db
       .from('profiles')
       .select('group_name, last_active')
       .not('group_name', 'is', null);
@@ -157,7 +157,7 @@ export default function AdminUsersPage() {
     const from = (currentPage - 1) * USERS_PER_PAGE;
     const to = from + USERS_PER_PAGE - 1;
 
-    let query = supabase
+    let query = db
       .from('profiles')
       .select('id, telegram_id, first_name, last_name, username, photo_url, group_name, institute, course, last_active, created_at', { count: 'exact' });
 
@@ -193,7 +193,7 @@ export default function AdminUsersPage() {
     }
 
     // Проверяем какие пользователи являются админами
-    const { data: adminsData } = await supabase
+    const { data: adminsData } = await db
       .from('admins')
       .select('telegram_id');
 
@@ -250,7 +250,7 @@ export default function AdminUsersPage() {
   async function toggleAdmin(user: UserProfile) {
     if (user.is_admin) {
       // Убираем админа
-      const { error } = await supabase
+      const { error } = await db
         .from('admins')
         .delete()
         .eq('telegram_id', user.telegram_id);
@@ -264,7 +264,7 @@ export default function AdminUsersPage() {
       }
     } else {
       // Добавляем админа
-      const { error } = await supabase
+      const { error } = await db
         .from('admins')
         .insert({
           telegram_id: user.telegram_id,

@@ -6,7 +6,7 @@ import { useAdminSchedule, type GroupedLesson } from '@/hooks/use-admin-schedule
 import { AdminLayout } from '@/components/AdminLayout';
 import { AdminClassCard } from '@/components/schedule/AdminClassCard';
 import { WeekToggle } from '@/components/schedule/WeekToggle';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -133,7 +133,7 @@ export default function AdminSchedulePage() {
   }, [searchQuery, groups]);
 
   async function loadGroups() {
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('groups')
       .select('id, name')
       .order('name');
@@ -149,7 +149,7 @@ export default function AdminSchedulePage() {
   async function loadAdminId() {
     if (!profile?.telegram_id) return;
 
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('admins')
       .select('id')
       .eq('telegram_id', profile.telegram_id)
@@ -309,7 +309,7 @@ export default function AdminSchedulePage() {
 
     // Получаем старые данные для аудита
     const lessonIds = editingLesson.rawLessons.map(l => l.id);
-    const { data: oldLessons, error: fetchError } = await supabase
+    const { data: oldLessons, error: fetchError } = await db
       .from('lessons')
       .select('*')
       .in('id', lessonIds);
@@ -320,7 +320,7 @@ export default function AdminSchedulePage() {
     }
 
     // Удаляем старые записи
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('lessons')
       .delete()
       .in('id', lessonIds);
@@ -350,7 +350,7 @@ export default function AdminSchedulePage() {
       end_date: editingCommonData.end_date || null,
     }));
 
-    const { data: insertedLessons, error: insertError } = await supabase
+    const { data: insertedLessons, error: insertError } = await db
       .from('lessons')
       .insert(lessonsToInsert)
       .select();
@@ -363,7 +363,7 @@ export default function AdminSchedulePage() {
 
     // Записываем в аудит-лог
     for (const oldLesson of oldLessons || []) {
-      await supabase
+      await db
         .from('schedule_audit_log')
         .insert({
           admin_id: adminId,
@@ -376,7 +376,7 @@ export default function AdminSchedulePage() {
     }
 
     for (const newLesson of insertedLessons || []) {
-      await supabase
+      await db
         .from('schedule_audit_log')
         .insert({
           admin_id: adminId,
@@ -408,7 +408,7 @@ export default function AdminSchedulePage() {
     const lessonIds = deletingLesson.rawLessons.map(l => l.id);
 
     // Получаем данные для аудита
-    const { data: oldLessons, error: fetchError } = await supabase
+    const { data: oldLessons, error: fetchError } = await db
       .from('lessons')
       .select('*')
       .in('id', lessonIds);
@@ -419,7 +419,7 @@ export default function AdminSchedulePage() {
     }
 
     // Удаляем все связанные занятия
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await db
       .from('lessons')
       .delete()
       .in('id', lessonIds);
@@ -432,7 +432,7 @@ export default function AdminSchedulePage() {
 
     // Записываем в аудит-лог для каждой записи
     for (const oldLesson of oldLessons || []) {
-      await supabase
+      await db
         .from('schedule_audit_log')
         .insert({
           admin_id: adminId,
@@ -485,7 +485,7 @@ export default function AdminSchedulePage() {
       end_date: commonLessonData.end_date || null,
     }));
 
-    const { data: insertedLessons, error: insertError } = await supabase
+    const { data: insertedLessons, error: insertError } = await db
       .from('lessons')
       .insert(lessonsToInsert)
       .select();
@@ -498,7 +498,7 @@ export default function AdminSchedulePage() {
 
     // Записываем в аудит-лог для каждого занятия
     for (const lesson of insertedLessons || []) {
-      await supabase
+      await db
         .from('schedule_audit_log')
         .insert({
           admin_id: adminId,

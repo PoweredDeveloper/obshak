@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 
 interface Lesson {
   id: number;
@@ -70,7 +70,7 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
     setError(null);
     const dbWeekType = weekType === 'even' ? 'Чет' : 'Неч';
 
-    const { data, error: fetchError } = await supabase
+    const { data, error: fetchError } = await db
       .from(tableName)
       .select('*')
       .eq('group_id', groupId)

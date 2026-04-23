@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import {
   formatScheduleTime,
   type WeekSchedule,
@@ -113,7 +113,7 @@ export function useSchedule(groupId: string | null, weekType: 'even' | 'odd') {
         // Берем занятия которые либо для конкретной недели, либо для обеих недель
         // И фильтруем по датам: показываем только если start_date <= today (или null)
         // И end_date >= today (или null)
-        const query = supabase
+        const query = db
           .from(tableName)
           .select('id, subject, type, teacher, room, day_of_week, lesson_number, time_start, time_end, subgroup, start_date, end_date')
           .eq('group_id', groupId)
@@ -130,7 +130,7 @@ export function useSchedule(groupId: string | null, weekType: 'even' | 'odd') {
           throw fetchError;
         }
 
-        // Фильтруем на клиенте по датам (так как Supabase .or() работает не так как нужно)
+        // Фильтруем на клиенте по датам
         const data = allData?.filter(lesson => {
           const startOk = !lesson.start_date || lesson.start_date <= today;
           const endOk = !lesson.end_date || lesson.end_date >= today;
@@ -272,32 +272,19 @@ export function useSchedule(groupId: string | null, weekType: 'even' | 'odd') {
 
     fetchSchedule();
 
-    // Подписываемся на изменения в таблице lessons/lessons_test для этой группы
-    if (!groupId) return;
+    if (!groupId) {
+      return () => controller.abort();
+    }
 
-    const channel = supabase
-      .channel(`${tableName}-${groupId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: tableName,
-          filter: `group_id=eq.${groupId}`,
-        },
-        () => {
-          // Инвалидируем кэш для этой группы (обе недели)
-          scheduleCache.delete(`${groupId}-even`);
-          scheduleCache.delete(`${groupId}-odd`);
-          // Перезагружаем расписание
-          refresh();
-        }
-      )
-      .subscribe();
+    const poll = window.setInterval(() => {
+      scheduleCache.delete(`${groupId}-even`);
+      scheduleCache.delete(`${groupId}-odd`);
+      refresh();
+    }, 60_000);
 
     return () => {
       controller.abort();
-      supabase.removeChannel(channel);
+      window.clearInterval(poll);
     };
   }, [groupId, weekType, refreshKey, refresh, tableName]);
 

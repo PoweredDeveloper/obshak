@@ -1,5 +1,5 @@
 requests
 python-dotenv
 python-docx
-supabase
+psycopg2-binary>=2.9.9
 pywin32

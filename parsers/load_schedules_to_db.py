@@ -1,153 +1,162 @@
 #!/usr/bin/env python3
 """
-Скрипт для загрузки расписаний в базу данных Supabase
+Загрузка расписаний в Postgres (DATABASE_URL).
 """
+import os
 from pathlib import Path
-from parse_schedule_word import parse_schedule_docx
-from supabase import create_client
+
+import psycopg2
+from psycopg2.extras import execute_batch
+
+from parse_schedule_word_v2 import parse_schedule_docx
+
 
 def load_env():
-    """Загружает переменные окружения из .env"""
-    env_path = Path('.env')
-    env_vars = {}
-    if env_path.exists():
+    """Загружает переменные окружения из .env (родительская папка проекта)."""
+    for base in (Path(__file__).resolve().parent.parent, Path('.').resolve()):
+        env_path = base / '.env'
+        if not env_path.exists():
+            continue
+        env_vars = {}
         with open(env_path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
                     env_vars[key] = value.strip('"').strip("'")
-    return env_vars
+        return env_vars
+    return {}
 
-def get_group_id_map(supabase):
-    """Получает маппинг имя группы -> ID группы"""
-    result = supabase.table('groups').select('id, name').execute()
-    return {g['name']: g['id'] for g in result.data}
 
-def clear_lessons(supabase):
-    """Очищает таблицу lessons"""
+def connect():
+    url = os.environ.get('DATABASE_URL')
+    if not url:
+        env = load_env()
+        pw = env.get('POSTGRES_PASSWORD', 'postgres')
+        url = f"postgresql://postgres:{pw}@localhost:5432/obshak"
+    return psycopg2.connect(url)
+
+
+def get_group_id_map(cur):
+    cur.execute("SELECT id::text, name FROM groups")
+    return {row[1]: row[0] for row in cur.fetchall()}
+
+
+def clear_lessons(cur):
     print("🗑️  Очистка таблицы lessons...")
-    supabase.table('lessons').delete().neq('id', 0).execute()
+    cur.execute("TRUNCATE lessons RESTART IDENTITY CASCADE")
     print("✓ Таблица очищена")
 
-def load_lessons_to_db(supabase, lessons, group_id_map):
-    """Загружает занятия в базу данных"""
-    
+
+def load_lessons_to_db(cur, lessons, group_id_map):
     lessons_to_insert = []
     skipped = 0
-    
+
     for lesson in lessons:
         group_name = lesson['group_name']
         group_id = group_id_map.get(group_name)
-        
+
         if not group_id:
             print(f"  ⚠️  Группа {group_name} не найдена в базе")
             skipped += 1
             continue
-        
-        lessons_to_insert.append({
-            'group_id': group_id,
-            'subgroup': lesson['subgroup'],
-            'subject': lesson['subject'],
-            'type': lesson['type'],
-            'teacher': lesson['teacher'],
-            'room': lesson['room'],
-            'day_of_week': lesson['day_of_week'],
-            'lesson_number': lesson['lesson_number'],
-            'time_start': lesson['time_start'],
-            'time_end': lesson['time_end'],
-            'week_type': lesson['week_type'],
-            'semester': 'Весенний',  # Пока хардкодим
-            'start_date': lesson.get('start_date'),
-            'end_date': lesson.get('end_date')
-        })
-    
-    # Загружаем батчами по 100
-    batch_size = 100
-    loaded = 0
-    
-    for i in range(0, len(lessons_to_insert), batch_size):
-        batch = lessons_to_insert[i:i + batch_size]
-        result = supabase.table('lessons').insert(batch).execute()
-        loaded += len(result.data)
-        print(f"  Загружено: {loaded}/{len(lessons_to_insert)}")
-    
-    return loaded, skipped
+
+        lessons_to_insert.append(
+            (
+                group_id,
+                lesson['subgroup'],
+                lesson['subject'],
+                lesson['type'],
+                lesson['teacher'],
+                lesson['room'],
+                lesson['day_of_week'],
+                lesson['lesson_number'],
+                lesson['time_start'],
+                lesson['time_end'],
+                lesson['week_type'],
+                'Весенний',
+                lesson.get('start_date'),
+                lesson.get('end_date'),
+            )
+        )
+
+    sql = """
+        INSERT INTO lessons (
+            group_id, subgroup, subject, type, teacher, room,
+            day_of_week, lesson_number, time_start, time_end,
+            week_type, semester, start_date, end_date
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+    """
+    execute_batch(cur, sql, lessons_to_insert, page_size=100)
+    return len(lessons_to_insert), skipped
+
 
 def main():
-    print("="*60)
-    print("📥 ЗАГРУЗКА РАСПИСАНИЙ В БАЗУ ДАННЫХ")
-    print("="*60)
-    
-    # Подключаемся к Supabase
-    print("\n🔌 Подключение к Supabase...")
-    env_vars = load_env()
-    supabase_url = env_vars.get('VITE_SUPABASE_URL')
-    supabase_key = env_vars.get('VITE_SUPABASE_PUBLISHABLE_KEY')
-    
-    if not supabase_url or not supabase_key:
-        print("❌ Не найдены переменные окружения Supabase")
-        return
-    
-    supabase = create_client(supabase_url, supabase_key)
+    print("=" * 60)
+    print("📥 ЗАГРУЗКА РАСПИСАНИЙ В POSTGRES")
+    print("=" * 60)
+
+    print("\n🔌 Подключение...")
+    conn = connect()
+    conn.autocommit = False
+    cur = conn.cursor()
     print("✓ Подключено")
-    
-    # Получаем маппинг групп
+
     print("\n📋 Получение списка групп...")
-    group_id_map = get_group_id_map(supabase)
+    group_id_map = get_group_id_map(cur)
     print(f"✓ Найдено групп в базе: {len(group_id_map)}")
-    
-    # Очищаем таблицу lessons
-    clear_lessons(supabase)
-    
-    # Получаем все .docx файлы
-    schedules_dir = Path('schedules')
+
+    clear_lessons(cur)
+    conn.commit()
+
+    schedules_dir = Path(__file__).resolve().parent / 'schedules'
     if not schedules_dir.exists():
-        print("❌ Папка schedules не найдена")
+        print("❌ Папка parsers/schedules не найдена")
         return
-    
-    # Получаем все .docx и .doc файлы
+
     docx_files = list(schedules_dir.glob('*.docx')) + list(schedules_dir.glob('*.doc'))
     print(f"\n📂 Найдено файлов расписаний: {len(docx_files)}")
-    
-    # Парсим и загружаем
+
     total_loaded = 0
     total_skipped = 0
     files_processed = 0
-    
+
     for file_path in docx_files:
         print(f"\n📖 Обработка: {file_path.name}")
-        
+
         try:
-            # Парсим файл
             lessons = parse_schedule_docx(str(file_path))
-            
+
             if not lessons:
                 print("  ⚠️  Занятия не найдены")
                 continue
-            
+
             print(f"  ✓ Распарсено занятий: {len(lessons)}")
-            
-            # Загружаем в базу
-            loaded, skipped = load_lessons_to_db(supabase, lessons, group_id_map)
-            
+
+            loaded, skipped = load_lessons_to_db(cur, lessons, group_id_map)
+            conn.commit()
+
             total_loaded += loaded
             total_skipped += skipped
             files_processed += 1
-            
+
             print(f"  ✅ Загружено: {loaded}, пропущено: {skipped}")
-            
+
         except Exception as e:
+            conn.rollback()
             print(f"  ❌ Ошибка: {e}")
-    
-    # Итоговая статистика
-    print("\n" + "="*60)
+
+    cur.close()
+    conn.close()
+
+    print("\n" + "=" * 60)
     print("📊 ИТОГОВАЯ СТАТИСТИКА")
-    print("="*60)
+    print("=" * 60)
     print(f"Обработано файлов: {files_processed}/{len(docx_files)}")
     print(f"Загружено занятий: {total_loaded}")
     print(f"Пропущено: {total_skipped}")
-    print("="*60)
+    print("=" * 60)
+
 
 if __name__ == '__main__':
     main()

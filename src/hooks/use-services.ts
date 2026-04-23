@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
+import { auth } from '@/integrations/postgrest/session';
 
 export interface ServiceCategory {
   id: string;
@@ -39,7 +40,7 @@ export function useServiceCategories(queryOptions?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['service-categories'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('service_categories')
         .select('*')
         .order('name');
@@ -57,7 +58,7 @@ export function useCreateCategory() {
   
   return useMutation({
     mutationFn: async (category: Omit<ServiceCategory, 'id'>) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('service_categories')
         .insert(category)
         .select()
@@ -77,7 +78,7 @@ export function useUpdateCategory() {
   
   return useMutation({
     mutationFn: async ({ id, ...category }: Partial<ServiceCategory> & { id: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('service_categories')
         .update(category)
         .eq('id', id)
@@ -98,7 +99,7 @@ export function useDeleteCategory() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from('service_categories')
         .delete()
         .eq('id', id);
@@ -124,7 +125,7 @@ export function useServices(options: UseServicesOptions = {}, queryOptions?: { e
   return useQuery({
     queryKey: ['services', categoryId, searchQuery, limit, offset],
     queryFn: async () => {
-      let query = supabase
+      let query = db
         .from('services')
         .select('*', { count: 'exact' })
         .eq('is_active', true);
@@ -161,7 +162,7 @@ export function useServiceReviews(serviceId: string, options: { limit?: number; 
   return useQuery({
     queryKey: ['service-reviews', serviceId, limit, offset],
     queryFn: async () => {
-      const { data, error, count } = await supabase
+      const { data, error, count } = await db
         .from('service_reviews')
         .select(`
           *,
@@ -191,10 +192,10 @@ export function useCreateReview() {
   
   return useMutation({
     mutationFn: async (review: { service_id: string; rating: number; comment?: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('service_reviews')
         .insert({ ...review, user_id: user.id })
         .select()
@@ -240,7 +241,7 @@ export function useUpdateReview() {
   
   return useMutation({
     mutationFn: async ({ id, service_id, ...review }: { id: string; service_id: string; rating: number; comment?: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('service_reviews')
         .update({ ...review, updated_at: new Date().toISOString() })
         .eq('id', id)
@@ -264,7 +265,7 @@ export function useAdminServices(options: { limit?: number; offset?: number } = 
   return useQuery({
     queryKey: ['admin-services', limit, offset],
     queryFn: async () => {
-      const { data, error, count } = await supabase
+      const { data, error, count } = await db
         .from('services')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
@@ -286,7 +287,7 @@ export function useCreateService() {
   
   return useMutation({
     mutationFn: async (service: Omit<Service, 'id' | 'created_at'>) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('services')
         .insert(service)
         .select()
@@ -307,7 +308,7 @@ export function useUpdateService() {
   
   return useMutation({
     mutationFn: async ({ id, ...service }: Partial<Service> & { id: string }) => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from('services')
         .update({ ...service, updated_at: new Date().toISOString() })
         .eq('id', id)
@@ -330,7 +331,7 @@ export function useDeleteService() {
   
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { error } = await db
         .from('services')
         .delete()
         .eq('id', id);

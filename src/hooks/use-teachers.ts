@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 
 export interface Teacher {
   id: string;
@@ -32,7 +32,7 @@ export function useTeachers(params: TeachersParams) {
     queryKey: ['teachers', userId, limit, offset, searchQuery, sortBy],
     queryFn: async (): Promise<TeachersResponse> => {
       // Строим запрос с фильтрацией и сортировкой
-      let query = supabase
+      let query = db
         .from('teachers')
         .select('id, full_name, department, email, average_rating, ratings_count', { count: 'exact' });
 
@@ -67,7 +67,7 @@ export function useTeachers(params: TeachersParams) {
       
       if (userId) {
         const teacherIds = teachers.map(t => t.id);
-        const { data: userRatings } = await supabase
+        const { data: userRatings } = await db
           .from('teacher_ratings')
           .select('teacher_id, rating')
           .eq('user_id', userId)

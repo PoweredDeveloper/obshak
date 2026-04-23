@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import type { Group } from '@/lib/schedule-data';
 
 interface GroupQueryResult {
@@ -45,10 +45,10 @@ export function useGroups() {
         setLoading(true);
         setError(null);
 
-        console.log('Fetching groups from Supabase...');
+        console.log('Fetching groups...');
 
         // Загружаем группы с информацией об институтах и направлениях
-        const { data, error: fetchError } = await supabase
+        const { data, error: fetchError } = await db
           .from('groups')
           .select(`
             id,
@@ -67,7 +67,7 @@ export function useGroups() {
         console.log('Query result:', { data, error: fetchError });
 
         if (fetchError) {
-          console.error('Supabase error:', fetchError);
+          console.error('Database error:', fetchError);
           throw fetchError;
         }
 

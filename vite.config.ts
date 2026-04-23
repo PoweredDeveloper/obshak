@@ -10,6 +10,10 @@ export default defineConfig(() => ({
     hmr: {
       overlay: false,
     },
+    proxy: {
+      '/rest/v1': { target: 'http://127.0.0.1:3000', changeOrigin: true },
+      '/auth': { target: 'http://127.0.0.1:3001', changeOrigin: true },
+    },
   },
   plugins: [react()],
   resolve: {

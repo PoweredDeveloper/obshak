@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/postgrest/client';
 import { toast } from 'sonner';
 import { Bell, Save, Eye, EyeOff, MessageCircle, ChevronRight, Home, User } from 'lucide-react';
 
@@ -43,7 +43,7 @@ export default function AdminNotificationsPage() {
   async function loadNotifications() {
     setLoading(true);
     
-    const { data, error } = await supabase
+    const { data, error } = await db
       .from('app_notifications')
       .select('*')
       .in('key', ['schedule_feedback', 'bug_report']);
@@ -65,7 +65,7 @@ export default function AdminNotificationsPage() {
   async function saveNotification(notification: Notification) {
     setSaving(true);
 
-    const { error } = await supabase
+    const { error } = await db
       .from('app_notifications')
       .update({
         enabled: notification.enabled,

@@ -1,4 +1,5 @@
-import { supabase } from '@/integrations/supabase/client';
+import { db, publicApiOrigin } from '@/integrations/postgrest/client';
+import { getUser, setAccessToken } from '@/integrations/postgrest/session';
 
 export interface DbProfile {
   id: string;
@@ -40,68 +41,49 @@ declare global {
   }
 }
 
-/**
- * Check if running inside Telegram Mini App
- */
 export function isTelegramWebApp(): boolean {
   return !!(window.Telegram?.WebApp?.initData);
 }
 
-/**
- * Get Telegram Mini App initData if available
- */
 export function getTelegramInitData(): string | null {
   return window.Telegram?.WebApp?.initData || null;
 }
 
-/**
- * Authenticate using Telegram Mini App initData
- */
-export async function authenticateWithTelegram(initData: string): Promise<DbProfile> {
-  const { data, error } = await supabase.functions.invoke('telegram-auth', {
-    body: { initData },
-  });
-
-  if (error) throw new Error(error.message);
-  if (!data?.token_hash || !data?.email) throw new Error('Authentication failed');
-
-  const profile = data.profile as DbProfile;
-
-  const { error: otpError } = await supabase.auth.verifyOtp({
-    token_hash: data.token_hash,
-    type: 'magiclink',
-  });
-
-  if (otpError) throw new Error(`Session error: ${otpError.message}`);
-
-  return profile;
+function telegramAuthUrl(): string {
+  const o = publicApiOrigin();
+  return o ? `${o}/auth/telegram` : '/auth/telegram';
 }
 
-/**
- * Authenticate using Telegram Login Widget callback data
- */
+export async function authenticateWithTelegram(initData: string): Promise<DbProfile> {
+  const res = await fetch(telegramAuthUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ initData }),
+  });
+  const data = (await res.json()) as { access_token?: string; profile?: DbProfile; error?: string };
+  if (!res.ok) throw new Error(data.error ?? 'Authentication failed');
+  if (!data.access_token || !data.profile) throw new Error('Authentication failed');
+
+  setAccessToken(data.access_token);
+  return data.profile;
+}
+
 export async function authenticateWithLoginWidget(userData: TelegramLoginWidgetUser): Promise<DbProfile> {
-  const { data, error } = await supabase.functions.invoke('telegram-auth', {
-    body: { loginWidgetData: userData },
+  const res = await fetch(telegramAuthUrl(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ loginWidgetData: userData }),
   });
+  const data = (await res.json()) as { access_token?: string; profile?: DbProfile; error?: string };
+  if (!res.ok) throw new Error(data.error ?? 'Authentication failed');
+  if (!data.access_token || !data.profile) throw new Error('Authentication failed');
 
-  if (error) throw new Error(error.message);
-  if (!data?.token_hash || !data?.email) throw new Error('Authentication failed');
-
-  const profile = data.profile as DbProfile;
-
-  const { error: otpError } = await supabase.auth.verifyOtp({
-    token_hash: data.token_hash,
-    type: 'magiclink',
-  });
-
-  if (otpError) throw new Error(`Session error: ${otpError.message}`);
-
-  return profile;
+  setAccessToken(data.access_token);
+  return data.profile;
 }
 
 export async function updateProfile(updates: Partial<DbProfile>): Promise<DbProfile> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await getUser();
   if (!user) throw new Error('Not authenticated');
 
   const allowedFields = ['group_id', 'group_name', 'institute', 'course', 'semester', 'onboarded'];
@@ -112,7 +94,7 @@ export async function updateProfile(updates: Partial<DbProfile>): Promise<DbProf
     }
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('profiles')
     .update(sanitized)
     .eq('id', user.id)
@@ -126,7 +108,7 @@ export async function updateProfile(updates: Partial<DbProfile>): Promise<DbProf
 }
 
 export async function fetchProfile(userId: string): Promise<DbProfile | null> {
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from('profiles')
     .select('*')
     .eq('id', userId)

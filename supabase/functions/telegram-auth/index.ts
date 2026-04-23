@@ -10,6 +10,10 @@ function getAllowedOrigins(): string[] {
     }
   }
   return [
+    'https://obshak.space',
+    'http://obshak.space',
+    'https://www.obshak.space',
+    'http://www.obshak.space',
     'https://awswwgvlnhbtcfeexyqv.supabase.co',
     'http://localhost:5173',
     'http://localhost:8080',

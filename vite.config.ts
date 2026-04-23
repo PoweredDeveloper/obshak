@@ -7,7 +7,6 @@ export default defineConfig(() => ({
   server: {
     host: "::",
     port: 8080,
-    allowedHosts: ["unreproving-aurelio-unspuriously.ngrok-free.dev"],
     hmr: {
       overlay: false,
     },

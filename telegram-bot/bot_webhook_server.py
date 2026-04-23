@@ -1,16 +1,42 @@
 """
-Telegram webhook server - receives updates, never calls Telegram API
-Works in Russia where api.telegram.org is blocked
+Telegram webhook server - receives updates and sends responses via Telegram API
+Works in Russia where api.telegram.org is blocked by routing through proxy
 """
 import os
 import asyncio
 import json
+import aiohttp
 from aiohttp import web
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 MINI_APP_URL = os.environ.get('MINI_APP_URL')
 WEBHOOK_PATH = os.environ.get('WEBHOOK_PATH', '/telegram-webhook')
 PORT = int(os.environ.get('PORT', 8080))
+
+TELEGRAM_API = 'https://api.telegram.org'
+
+async def send_telegram_message(chat_id, text, keyboard=None, parse_mode='Markdown'):
+    """Send message via Telegram Bot API"""
+    url = f'{TELEGRAM_API}/bot{BOT_TOKEN}/sendMessage'
+    
+    payload = {
+        'chat_id': chat_id,
+        'text': text,
+        'parse_mode': parse_mode,
+    }
+    
+    if keyboard:
+        payload['reply_markup'] = keyboard
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as resp:
+                result = await resp.json()
+                print(f"✅ Message sent: {result}")
+                return result
+    except Exception as e:
+        print(f"❌ Error sending message: {e}")
+        return None
 
 async def handle_start(payload):
     """Handle /start command"""
@@ -39,13 +65,7 @@ async def handle_start(payload):
         f"Нажми на кнопку ниже, чтобы начать! 👇"
     )
 
-    return {
-        "method": "sendMessage",
-        "chat_id": chat_id,
-        "text": message,
-        "parse_mode": "Markdown",
-        "reply_markup": keyboard
-    }
+    await send_telegram_message(chat_id, message, keyboard)
 
 async def handle_help_callback(payload):
     """Handle help callback"""
@@ -67,28 +87,21 @@ async def handle_help_callback(payload):
         "💡 После добавления приложение будет открываться мгновенно!"
     )
 
-    return {
-        "method": "sendMessage",
-        "chat_id": chat_id,
-        "text": help_text,
-        "parse_mode": "Markdown"
-    }
+    await send_telegram_message(chat_id, help_text)
 
 async def process_update(payload):
-    """Process incoming update and return response"""
+    """Process incoming update"""
     # Check for callback query
     if 'callback_query' in payload:
         data = payload['callback_query'].get('data', '')
         if data == 'help_home_screen':
-            return await handle_help_callback(payload)
+            await handle_help_callback(payload)
 
     # Check for /start command
     if 'message' in payload:
         text = payload['message'].get('text', '')
         if text == '/start' or text.startswith('/start '):
-            return await handle_start(payload)
-
-    return None
+            await handle_start(payload)
 
 async def webhook_handler(request):
     """Handle incoming webhook from Telegram"""
@@ -96,13 +109,9 @@ async def webhook_handler(request):
         payload = await request.json()
         print(f"📥 Received update: {json.dumps(payload, indent=2)[:500]}")
 
-        response = await process_update(payload)
-
-        if response:
-            # Return response that Telegram will execute
-            return web.json_response(response)
-        else:
-            return web.json_response({"ok": True})
+        await process_update(payload)
+        
+        return web.json_response({"ok": True})
 
     except Exception as e:
         print(f"❌ Error: {e}")

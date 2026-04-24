@@ -10,6 +10,7 @@ from aiohttp import web
 
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
 MINI_APP_URL = os.environ.get('MINI_APP_URL')
+BASE_URL = os.environ.get('BASE_URL', '').rstrip('/')
 WEBHOOK_PATH = os.environ.get('WEBHOOK_PATH', '/telegram-webhook')
 PORT = int(os.environ.get('PORT', 8080))
 
@@ -130,10 +131,11 @@ async def main():
     print(f"🤖 Webhook server running on port {PORT}")
     print(f"📍 Webhook path: {WEBHOOK_PATH}")
     print(f"⏳ Waiting for incoming webhooks from Telegram...")
-    print(f"⚠️  Remember to set webhook manually:")
-    print(f"   curl -X POST 'https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook'")
-    print(f"   -H 'Content-Type: application/json'")
-    print(f"   -d '{{\"url\": \"https://obshak.space/telegram-webhook\"}}'")
+    webhook_url = f"{BASE_URL}{WEBHOOK_PATH}" if BASE_URL else f"<BASE_URL>{WEBHOOK_PATH}"
+    print("⚠️  Remember to set webhook manually:")
+    print("   curl -X POST 'https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook'")
+    print("   -H 'Content-Type: application/json'")
+    print(f"   -d '{{\"url\": \"{webhook_url}\"}}'")
 
     await asyncio.Event().wait()
 

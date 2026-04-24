@@ -5,6 +5,7 @@
 	}
 }
 
+# Site label = public hostname (must match DNS + TLS). Change to your domain.
 obshak.space {
 	@telegram path /telegram-webhook*
 	handle @telegram {

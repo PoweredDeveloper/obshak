@@ -26,7 +26,9 @@ nano .env # fill in your values
 
 # 4. Make sure domain DNS points to your VDS
 
-A record: obshak.online -> your VDS IP
+**A/AAAA** for the **exact hostname** in `Caddyfile` (first token on the site line, e.g. `obshak.space`) must point to this server (or use Cloudflare + origin cert — see earlier notes). For **`www`**, add a second site block or use `obshak.space, www.obshak.space {` on one line.
+
+**Using another domain:** edit `Caddyfile` site name → set `.env` `MINI_APP_URL`, `BASE_URL`, and include the same origin in `ALLOWED_ORIGINS` → `docker compose up -d --build` (frontend embeds `VITE_TELEGRAM_BOT_USERNAME` only; leave `VITE_PUBLIC_API_ORIGIN` empty if the SPA and API share this host) → set Telegram [webhook](https://core.telegram.org/bots/api#setwebhook) and BotFather Mini App URL to `https://<your-domain>/…`.
 
 # 5. Start everything
 

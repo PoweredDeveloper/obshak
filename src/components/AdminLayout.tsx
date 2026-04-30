@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Calendar, LogOut, Briefcase } from 'lucide-react';
+import { Calendar, Users, LogOut, Bell, Briefcase } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -12,7 +12,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
   const location = useLocation();
 
   const navItems = [
-    { path: '/admin', label: 'Расписание', icon: Calendar },
+    { path: '/admin/schedule', label: 'Расписание', icon: Calendar },
+    { path: '/admin/users', label: 'Пользователи', icon: Users },
+    { path: '/admin/notifications', label: 'Уведомления', icon: Bell },
     { path: '/admin/services', label: 'Услуги', icon: Briefcase },
   ];
 

@@ -7,25 +7,30 @@ export function cn(...inputs: ClassValue[]) {
 
 // Функция для определения контрастного цвета текста (черный или белый)
 export function getContrastColor(hexColor: string): string {
-  const hslMatch = hexColor.match(/hsla?\(\s*[\d.]+(?:deg|rad|turn)?\s*,\s*[\d.]+%\s*,\s*([\d.]+)%/i);
-  if (hslMatch) {
-    return Number(hslMatch[1]) > 45 ? '#000000' : '#FFFFFF';
+  // Убираем # если есть и проверяем формат
+  const hex = hexColor.replace('#', '');
+
+  // Валидация: hex должен быть 3 или 6 символов
+  if (!/^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$/.test(hex)) {
+    return '#000000'; // Fallback для невалидного цвета
   }
 
-  // Убираем # если есть
-  const hex = hexColor.replace('#', '');
-  if (!/^[0-9a-f]{6}$/i.test(hex)) {
+  // Расширенный формат (например, #fff -> #ffffff)
+  const fullHex = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
+
+  // Конвертируем в RGB
+  const r = parseInt(fullHex.substring(0, 2), 16);
+  const g = parseInt(fullHex.substring(2, 4), 16);
+  const b = parseInt(fullHex.substring(4, 6), 16);
+
+  // Проверка на NaN (на случай если parseInt не сработал)
+  if (isNaN(r) || isNaN(g) || isNaN(b)) {
     return '#000000';
   }
-  
-  // Конвертируем в RGB
-  const r = parseInt(hex.substr(0, 2), 16);
-  const g = parseInt(hex.substr(2, 2), 16);
-  const b = parseInt(hex.substr(4, 2), 16);
-  
+
   // Вычисляем яркость (luminance)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  
+
   // Если яркий цвет - возвращаем темный текст, если темный - светлый текст
   return luminance > 0.5 ? '#000000' : '#FFFFFF';
 }

@@ -20,7 +20,10 @@ def load_env():
 from supabase import create_client
 
 env_vars = load_env()
-supabase = create_client(env_vars['VITE_SUPABASE_URL'], env_vars['VITE_SUPABASE_PUBLISHABLE_KEY'])
+supabase = create_client(
+    env_vars.get('SUPABASE_URL', env_vars.get('VITE_SUPABASE_URL')),
+    env_vars.get('SUPABASE_SERVICE_ROLE_KEY', env_vars.get('VITE_SUPABASE_SERVICE_ROLE_KEY')),
+)
 
 print("Получаем записи с датами...")
 response = supabase.table('lessons').select('id, subject').like('subject', 'С %').execute()

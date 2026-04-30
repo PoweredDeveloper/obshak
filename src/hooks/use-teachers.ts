@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { db } from '@/integrations/postgrest/client';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface Teacher {
   id: string;
@@ -32,7 +32,7 @@ export function useTeachers(params: TeachersParams) {
     queryKey: ['teachers', userId, limit, offset, searchQuery, sortBy],
     queryFn: async (): Promise<TeachersResponse> => {
       // Строим запрос с фильтрацией и сортировкой
-      let query = db
+      let query = supabase
         .from('teachers')
         .select('id, full_name, department, email, average_rating, ratings_count', { count: 'exact' });
 
@@ -67,7 +67,7 @@ export function useTeachers(params: TeachersParams) {
       
       if (userId) {
         const teacherIds = teachers.map(t => t.id);
-        const { data: userRatings } = await db
+        const { data: userRatings } = await supabase
           .from('teacher_ratings')
           .select('teacher_id, rating')
           .eq('user_id', userId)
@@ -80,24 +80,16 @@ export function useTeachers(params: TeachersParams) {
 
         teachersWithRatings = teachers.map(teacher => ({
           ...teacher,
-          average_rating: typeof teacher.average_rating === 'string'
-            ? parseFloat(teacher.average_rating)
-            : (teacher.average_rating ?? 0),
-          ratings_count: typeof teacher.ratings_count === 'string'
-            ? parseInt(teacher.ratings_count, 10)
-            : (teacher.ratings_count ?? 0),
+          average_rating: parseFloat(teacher.average_rating as any) || 0,
+          ratings_count: parseInt(teacher.ratings_count as any) || 0,
           user_rating: userRatingsMap[teacher.id] || null,
         }));
       } else {
-        teachersWithRatings = teachers.map(t => ({
-          ...t,
-          average_rating: typeof t.average_rating === 'string'
-            ? parseFloat(t.average_rating)
-            : (t.average_rating ?? 0),
-          ratings_count: typeof t.ratings_count === 'string'
-            ? parseInt(t.ratings_count, 10)
-            : (t.ratings_count ?? 0),
-          user_rating: null
+        teachersWithRatings = teachers.map(t => ({ 
+          ...t, 
+          average_rating: parseFloat(t.average_rating as any) || 0,
+          ratings_count: parseInt(t.ratings_count as any) || 0,
+          user_rating: null 
         }));
       }
 

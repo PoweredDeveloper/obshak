@@ -1,7 +1,8 @@
 import { AdminLayout } from '@/components/AdminLayout';
+import { useAdmin } from '@/hooks/use-admin';
 import { useAppSettings } from '@/hooks/use-app-settings';
 import { useServiceCategories, useAdminServices, useCreateService, useUpdateService, useDeleteService, useCreateCategory, useUpdateCategory, useDeleteCategory } from '@/hooks/use-services';
-import { db } from '@/integrations/postgrest/client';
+import { supabase } from '@/integrations/supabase/client';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,10 +12,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 
 export default function AdminServicesPage() {
+  const { isAdmin, loading: adminLoading } = useAdmin();
+  const navigate = useNavigate();
   const { data: settings } = useAppSettings();
   const { data: categories } = useServiceCategories();
   const [servicesOffset, setServicesOffset] = useState(0);
@@ -51,9 +55,30 @@ export default function AdminServicesPage() {
 
   const servicesEnabled = settings?.['features.services_enabled'] === true;
 
+  useEffect(() => {
+    if (!adminLoading && !isAdmin) {
+      toast.error('Доступ запрещен');
+      navigate('/');
+    }
+  }, [isAdmin, adminLoading, navigate]);
+
+  if (adminLoading) {
+    return (
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <p>Загрузка...</p>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!isAdmin) {
+    return null;
+  }
+
   const toggleServices = async (enabled: boolean) => {
     try {
-      const { error } = await (db as any)
+      const { error } = await (supabase as any)
         .from('app_settings')
         .update({ 
           value: enabled,

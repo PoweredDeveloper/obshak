@@ -1,20 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { db } from '@/integrations/postgrest/client';
-import { auth } from '@/integrations/postgrest/session';
+import { supabase } from '@/integrations/supabase/client';
 import {
   type DbProfile,
-  type TelegramLoginWidgetUser,
   authenticateWithTelegram,
-  authenticateWithLoginWidget,
+  authenticateWithTelegramWebsite,
+  type TelegramLoginWidgetData,
   updateProfile as updateProfileApi,
   fetchProfile,
   getTelegramInitData,
-  isTelegramWebApp,
 } from '@/lib/telegram-auth';
 import { initActivityTracking } from '@/lib/activity-tracker';
 import { clearGroupsCache } from '@/hooks/use-groups';
-import { clearScheduleCache } from '@/hooks/use-schedule';
-import { clearFavoritesCache } from '@/hooks/use-favorite-groups';
 
 interface Notification {
   key: string;
@@ -28,14 +24,14 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isOnboarded: boolean;
-  isWebApp: boolean;
   login: () => Promise<void>;
-  loginWithWidget: (userData: TelegramLoginWidgetUser) => Promise<void>;
+  loginWithWidget: (data: TelegramLoginWidgetData) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<DbProfile>) => Promise<void>;
   error: string | null;
   notifications: Record<string, Notification>;
   isAdmin: boolean;
+  isAdminLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -50,7 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<Record<string, Notification>>({});
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isWebApp] = useState(() => isTelegramWebApp());
+  const [isAdminLoading, setIsAdminLoading] = useState(false);
 
   const login = useCallback(async () => {
     setIsLoading(true);
@@ -63,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const nextProfile = await authenticateWithTelegram(initData);
+      setIsAdminLoading(true);
       setProfile(nextProfile);
     } catch (error) {
       setProfile(null);
@@ -72,14 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loginWithWidget = useCallback(async (userData: TelegramLoginWidgetUser) => {
+  const loginWithWidget = useCallback(async (data: TelegramLoginWidgetData) => {
     setIsLoading(true);
     setError(null);
-
     try {
-      const nextProfile = await authenticateWithLoginWidget(userData);
+      const nextProfile = await authenticateWithTelegramWebsite(data);
+      setIsAdminLoading(true);
       setProfile(nextProfile);
-      initActivityTracking();
     } catch (error) {
       setProfile(null);
       setError(getErrorMessage(error));
@@ -88,52 +84,96 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Проверяем статус админа (polling replaces Supabase Realtime)
+  // Проверяем статус админа
   useEffect(() => {
     async function checkAdmin() {
       if (!profile?.telegram_id) {
         setIsAdmin(false);
+        setIsAdminLoading(false);
         return;
       }
 
-      const { data } = await db
+      setIsAdminLoading(true);
+
+      const { data, error } = await supabase
         .from('admins')
         .select('id')
-        .eq('telegram_id', profile.telegram_id)
-        .single();
+        .eq('telegram_id', Number(profile.telegram_id))
+        .limit(1);
 
-      setIsAdmin(!!data);
+      if (error) {
+        console.error('Failed to check admin status:', error);
+        setIsAdmin(false);
+      } else {
+        setIsAdmin((data?.length ?? 0) > 0);
+      }
+
+      setIsAdminLoading(false);
     }
 
-    void checkAdmin();
-    const id = window.setInterval(() => {
-      void checkAdmin();
-    }, 45_000);
-    return () => window.clearInterval(id);
+    checkAdmin();
+
+    // Подписываемся на изменения в таблице admins
+    const channel = supabase
+      .channel('admin-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'admins',
+        },
+        () => {
+          // Перепроверяем статус админа при изменениях
+          checkAdmin();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.telegram_id]);
 
-  // Уведомления (polling replaces Realtime)
+  // Загружаем уведомления один раз при старте
   useEffect(() => {
     async function loadNotifications() {
-      const { data } = await db
+      const { data } = await supabase
         .from('app_notifications')
         .select('key, enabled, text, link')
         .eq('enabled', true);
 
       if (data) {
         const notificationsMap: Record<string, Notification> = {};
-        data.forEach((notification) => {
+        data.forEach(notification => {
           notificationsMap[notification.key] = notification;
         });
         setNotifications(notificationsMap);
       }
     }
 
-    void loadNotifications();
-    const id = window.setInterval(() => {
-      void loadNotifications();
-    }, 45_000);
-    return () => window.clearInterval(id);
+    loadNotifications();
+
+    // Подписываемся на изменения уведомлений
+    const channel = supabase
+      .channel('notifications-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'app_notifications',
+        },
+        () => {
+          // Перезагружаем уведомления при любом изменении
+          loadNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
@@ -150,9 +190,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const nextProfile = await fetchProfile(userId);
         if (!isActive) return;
 
+        setIsAdminLoading(!!nextProfile);
         setProfile(nextProfile);
         setError(nextProfile ? null : 'Профиль не найден');
-
+        
         // Обновляем активность при успешной загрузке профиля
         if (nextProfile) {
           initActivityTracking();
@@ -172,7 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const {
           data: { session },
-        } = await auth.getSession();
+        } = await supabase.auth.getSession();
 
         if (!isActive) return;
 
@@ -181,35 +222,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Only auto-authenticate if running inside Telegram Mini App
-        if (isWebApp) {
-          const initData = getTelegramInitData();
-          if (initData) {
-            try {
-              const nextProfile = await authenticateWithTelegram(initData);
-              if (!isActive) return;
-
-              setProfile(nextProfile);
-              setError(null);
-
-              // Обновляем активность при успешной аутентификации
-              if (nextProfile) {
-                initActivityTracking();
-              }
-            } catch (error) {
-              if (!isActive) return;
-
-              setProfile(null);
-              setError(getErrorMessage(error));
-            } finally {
-              finishLoading();
-              return;
-            }
-          }
+        const initData = getTelegramInitData();
+        if (!initData) {
+          finishLoading();
+          return;
         }
 
-        // For website, just finish loading - user needs to click Login Widget
-        finishLoading();
+        try {
+          const nextProfile = await authenticateWithTelegram(initData);
+          if (!isActive) return;
+
+          setIsAdminLoading(true);
+          setProfile(nextProfile);
+          setError(null);
+          
+          // Обновляем активность при успешной аутентификации
+          if (nextProfile) {
+            initActivityTracking();
+          }
+        } catch (error) {
+          if (!isActive) return;
+
+          setProfile(null);
+          setError(getErrorMessage(error));
+        } finally {
+          finishLoading();
+        }
       } catch (error) {
         if (!isActive) return;
 
@@ -222,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (!isActive) return;
 
       if (event === 'SIGNED_OUT') {
@@ -247,16 +285,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isActive = false;
       subscription.unsubscribe();
     };
-  }, [isWebApp]);
+  }, []);
 
   const logout = useCallback(async () => {
-    await auth.signOut();
+    await supabase.auth.signOut();
     setProfile(null);
+    setIsAdmin(false);
+    setIsAdminLoading(false);
     setError(null);
-    // Clear all caches on logout
-    clearGroupsCache();
-    clearScheduleCache();
-    clearFavoritesCache();
+    clearGroupsCache(); // Очищаем кеш групп при выходе
   }, []);
 
   const updateProfileFn = useCallback(async (updates: Partial<DbProfile>) => {
@@ -272,7 +309,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!profile,
         isOnboarded: !!profile?.onboarded,
-        isWebApp,
         login,
         loginWithWidget,
         logout,
@@ -280,6 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         error,
         notifications,
         isAdmin,
+        isAdminLoading,
       }}
     >
       {children}

@@ -17,8 +17,6 @@ import Onboarding from "./pages/Onboarding.tsx";
 import LoginPage from "./pages/LoginPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import AdminSchedulePage from "./pages/AdminSchedulePage.tsx";
-import AdminUsersPage from "./pages/AdminUsersPage.tsx";
-import AdminNotificationsPage from "./pages/AdminNotificationsPage.tsx";
 import AdminServicesPage from "./pages/AdminServicesPage.tsx";
 import ServiceDetailPage from "./pages/ServiceDetailPage.tsx";
 
@@ -28,7 +26,7 @@ const queryClient = new QueryClient();
 const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
 
 function AppContent() {
-  const { profile, isAuthenticated, isOnboarded, isLoading, updateProfile, logout } = useAuth();
+  const { profile, isAuthenticated, isOnboarded, isLoading, isAdmin, updateProfile, logout } = useAuth();
   const location = useLocation();
   
   // Проверяем, находимся ли мы на админской странице
@@ -100,10 +98,10 @@ function AppContent() {
         <Route path="/teachers" element={<TeachersPage />} />
         <Route path="/service/:id" element={<ServiceDetailPage />} />
         <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/admin" element={<Navigate to="/admin/schedule" replace />} />
-        <Route path="/admin/schedule" element={<AdminSchedulePage />} />
-        <Route path="/admin/users" element={<AdminUsersPage />} />
-        <Route path="/admin/notifications" element={<AdminNotificationsPage />} />
+        <Route path="/admin" element={<AdminSchedulePage />} />
+        <Route path="/admin/schedule" element={<Navigate to="/admin" replace />} />
+        <Route path="/admin/users" element={<Navigate to="/admin" replace />} />
+        <Route path="/admin/notifications" element={<Navigate to="/admin" replace />} />
         <Route path="/admin/services" element={<AdminServicesPage />} />
         <Route
           path="/profile"

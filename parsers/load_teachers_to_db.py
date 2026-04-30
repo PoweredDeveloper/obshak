@@ -3,12 +3,13 @@
 Скрипт для загрузки преподавателей в базу данных Supabase
 """
 from pathlib import Path
+import os
 from parse_teachers import parse_teachers
 from supabase import create_client
 
 def load_env():
     """Загружает переменные окружения из .env"""
-    env_path = Path('classmate-connect/.env')
+    env_path = Path(__file__).resolve().parents[1] / '.env'
     env_vars = {}
     if env_path.exists():
         with open(env_path, 'r', encoding='utf-8') as f:
@@ -17,7 +18,7 @@ def load_env():
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
                     env_vars[key] = value.strip('"').strip("'")
-    return env_vars
+    return {**env_vars, **os.environ}
 
 def main():
     print("="*60)
@@ -27,8 +28,8 @@ def main():
     # Подключаемся к Supabase
     print("\n🔌 Подключение к Supabase...")
     env_vars = load_env()
-    supabase_url = env_vars.get('VITE_SUPABASE_URL')
-    supabase_key = env_vars.get('VITE_SUPABASE_PUBLISHABLE_KEY')
+    supabase_url = env_vars.get('SUPABASE_URL') or env_vars.get('VITE_SUPABASE_URL')
+    supabase_key = env_vars.get('SUPABASE_SERVICE_ROLE_KEY') or env_vars.get('VITE_SUPABASE_SERVICE_ROLE_KEY')
     
     if not supabase_url or not supabase_key:
         print("❌ Не найдены переменные окружения Supabase")

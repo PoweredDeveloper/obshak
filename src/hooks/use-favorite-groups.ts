@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/integrations/postgrest/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface FavoriteGroup {
@@ -15,11 +15,6 @@ export interface FavoriteGroup {
 const favoritesCache = new Map<string, { favorites: FavoriteGroup[]; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 минут
 
-// Функция для очистки кэша (экспортируем для использования при logout)
-export function clearFavoritesCache() {
-  favoritesCache.clear();
-}
-
 export function useFavoriteGroups() {
   const { profile } = useAuth();
   const [favorites, setFavorites] = useState<FavoriteGroup[]>([]);
@@ -31,14 +26,30 @@ export function useFavoriteGroups() {
       return;
     }
 
-    void loadFavorites();
+    loadFavorites();
 
-    const poll = window.setInterval(() => {
-      favoritesCache.delete(profile.id);
-      void loadFavorites();
-    }, 60_000);
+    // Подписка на изменения
+    const channel = supabase
+      .channel('favorite-groups-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'favorite_groups',
+          filter: `user_id=eq.${profile.id}`,
+        },
+        () => {
+          // Инвалидируем кэш при изменениях
+          favoritesCache.delete(profile.id);
+          loadFavorites();
+        }
+      )
+      .subscribe();
 
-    return () => window.clearInterval(poll);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.id]);
 
   async function loadFavorites() {
@@ -54,7 +65,7 @@ export function useFavoriteGroups() {
 
     setLoading(true);
 
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from('favorite_groups')
       .select('id, group_id, group_name, institute, course, created_at')
       .eq('user_id', profile.id)
@@ -64,13 +75,12 @@ export function useFavoriteGroups() {
       console.error('Error loading favorites:', error);
     } else {
       const favoritesList = data || [];
-
       setFavorites(favoritesList);
-
+      
       // Сохраняем в кэш
       favoritesCache.set(profile.id, {
         favorites: favoritesList,
-        timestamp: Date.now(),
+        timestamp: Date.now()
       });
     }
 
@@ -80,7 +90,7 @@ export function useFavoriteGroups() {
   async function addFavorite(groupId: string, groupName: string, institute: string | null, course: number | null) {
     if (!profile?.id) return { success: false, error: 'Not authenticated' };
 
-    const { data, error } = await db
+    const { data, error } = await supabase
       .from('favorite_groups')
       .insert({
         user_id: profile.id,
@@ -102,7 +112,7 @@ export function useFavoriteGroups() {
 
     // Добавляем только новый элемент в начало списка
     if (data) {
-      setFavorites((prev) => [data, ...prev]);
+      setFavorites(prev => [data, ...prev]);
     }
 
     return { success: true };
@@ -112,9 +122,12 @@ export function useFavoriteGroups() {
     if (!profile?.id) return { success: false, error: 'Not authenticated' };
 
     // Оптимистично удаляем из UI
-    setFavorites((prev) => prev.filter((f) => f.id !== favoriteId));
+    setFavorites(prev => prev.filter(f => f.id !== favoriteId));
 
-    const { error } = await db.from('favorite_groups').delete().eq('id', favoriteId);
+    const { error } = await supabase
+      .from('favorite_groups')
+      .delete()
+      .eq('id', favoriteId);
 
     if (error) {
       console.error('Error removing favorite:', error);
@@ -130,7 +143,7 @@ export function useFavoriteGroups() {
   }
 
   function isFavorite(groupId: string): boolean {
-    return favorites.some((f) => f.group_id === groupId);
+    return favorites.some(f => f.group_id === groupId);
   }
 
   return {

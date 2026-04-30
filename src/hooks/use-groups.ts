@@ -1,24 +1,21 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/integrations/postgrest/client';
+import { supabase } from '@/integrations/supabase/client';
 import type { Group } from '@/lib/schedule-data';
-
-interface GroupQueryResult {
-  id: string;
-  name: string;
-  course: number | null;
-  form: string | null;
-  directions: {
-    name: string;
-    institutes: {
-      name: string;
-    };
-  } | null;
-}
 
 // Кеш для групп (в памяти приложения)
 let cachedGroups: Group[] | null = null;
 let cacheTimestamp: number | null = null;
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 часа
+
+function inferInstituteFromGroupName(groupName: string): string {
+  const name = (groupName || '').toUpperCase();
+  if (name.includes('СЖ') || name.includes('АР') || name.includes('ГП') || name.includes('РП')) return 'ИАИД';
+  if (name.includes('ИС') || name.includes('ЦТ')) return 'ИС';
+  if (name.includes('ИЗ') || name.includes('ПГ') || name.includes('СТ')) return 'ИСТИЭС';
+  if (name.includes('АП') || name.includes('КП') || name.includes('ТТ')) return 'ИТС';
+  if (name.includes('АД') || name.includes('ЖК') || name.includes('ПМ') || name.includes('УН') || name.includes('ЭН')) return 'ИЭУС';
+  return 'ИЭУС';
+}
 
 // Функция для очистки кеша (экспортируем для использования при logout)
 export function clearGroupsCache() {
@@ -45,19 +42,19 @@ export function useGroups() {
         setLoading(true);
         setError(null);
 
-        console.log('Fetching groups...');
+        console.log('Fetching groups from Supabase...');
 
         // Загружаем группы с информацией об институтах и направлениях
-        const { data, error: fetchError } = await db
+        const { data, error: fetchError } = await supabase
           .from('groups')
           .select(`
             id,
             name,
             course,
             form,
-            directions!inner (
+            directions (
               name,
-              institutes!inner (
+              institutes (
                 name
               )
             )
@@ -67,20 +64,22 @@ export function useGroups() {
         console.log('Query result:', { data, error: fetchError });
 
         if (fetchError) {
-          console.error('Database error:', fetchError);
+          console.error('Supabase error:', fetchError);
           throw fetchError;
         }
 
         // Преобразуем данные в нужный формат
-        const formattedGroups: Group[] = (data || []).map((g: GroupQueryResult) => {
+        const formattedGroups: Group[] = (data || []).map((g: any) => {
           // Вычисляем семестр на основе курса (примерно)
           const semester = g.course ? g.course * 2 : 1;
-
+          const inferredInstitute = inferInstituteFromGroupName(g.name || '');
+          const instituteName = g.directions?.institutes?.name || inferredInstitute;
+          
           return {
             id: g.id,
             name: g.name,
-            institute: g.directions?.institutes?.name || 'Unknown',
-            direction: g.directions?.name || 'Unknown',
+            institute: instituteName,
+            direction: g.directions?.name || 'Не указано',
             course: g.course || 1,
             semester: semester,
           };

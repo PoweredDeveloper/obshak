@@ -1,21 +1,26 @@
-{
-	# Avoid ERR_QUIC_PROTOCOL_ERROR when UDP/443 is filtered or QUIC is flaky (browser uses HTTP/2).
-	servers {
-		protocols h1 h2
-	}
+obshak.space {
+    encode gzip
+
+    # Telegram bot webhook endpoint
+    reverse_proxy /telegram-webhook telegram-bot:8080
+
+    # Supabase API gateway running on host via `supabase start`
+    reverse_proxy /rest/* host.docker.internal:54321
+    reverse_proxy /auth/* host.docker.internal:54321
+    reverse_proxy /functions/* host.docker.internal:54321
+    reverse_proxy /realtime/* host.docker.internal:54321
+    reverse_proxy /storage/* host.docker.internal:54321
+
+    # Frontend app
+    reverse_proxy app:80
 }
 
-# Site label = public hostname (must match DNS + TLS). Change to your domain.
-obshak.space {
-	@telegram path /telegram-webhook*
-	handle @telegram {
-		reverse_proxy telegram-bot:8080
-	}
-	handle /rest/* {
-		reverse_proxy postgrest:3000
-	}
-	handle /auth/* {
-		reverse_proxy auth:3001
-	}
-	reverse_proxy app:80
+studio.obshak.space {
+    encode gzip
+
+    basic_auth {
+        {$STUDIO_BASIC_AUTH_USER} {$STUDIO_BASIC_AUTH_HASH}
+    }
+
+    reverse_proxy host.docker.internal:54323
 }

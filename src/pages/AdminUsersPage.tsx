@@ -10,9 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { db } from '@/integrations/postgrest/client';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Search, Users, TrendingUp, Calendar, MessageCircle, RefreshCw, Shield, ShieldOff, ArrowUpDown } from 'lucide-react';
+import { Search, Users, TrendingUp, Calendar, MessageCircle, RefreshCw, Shield, ShieldOff, ArrowUpDown, UserPlus, Repeat, Ban, Bug } from 'lucide-react';
 
 interface UserProfile {
   id: string;
@@ -88,7 +88,7 @@ export default function AdminUsersPage() {
   }, [currentPage, searchQuery, sortBy, selectedGroup, activeTab]);
 
   async function loadGroups() {
-    const { data } = await db
+    const { data } = await supabase
       .from('profiles')
       .select('group_name')
       .not('group_name', 'is', null)
@@ -101,7 +101,7 @@ export default function AdminUsersPage() {
   async function loadGroupStats() {
     setLoadingGroupStats(true);
 
-    const { data: allProfiles } = await db
+    const { data: allProfiles } = await supabase
       .from('profiles')
       .select('group_name, last_active')
       .not('group_name', 'is', null);
@@ -157,7 +157,7 @@ export default function AdminUsersPage() {
     const from = (currentPage - 1) * USERS_PER_PAGE;
     const to = from + USERS_PER_PAGE - 1;
 
-    let query = db
+    let query = supabase
       .from('profiles')
       .select('id, telegram_id, first_name, last_name, username, photo_url, group_name, institute, course, last_active, created_at', { count: 'exact' });
 
@@ -193,7 +193,7 @@ export default function AdminUsersPage() {
     }
 
     // Проверяем какие пользователи являются админами
-    const { data: adminsData } = await db
+    const { data: adminsData } = await supabase
       .from('admins')
       .select('telegram_id');
 
@@ -250,7 +250,7 @@ export default function AdminUsersPage() {
   async function toggleAdmin(user: UserProfile) {
     if (user.is_admin) {
       // Убираем админа
-      const { error } = await db
+      const { error } = await supabase
         .from('admins')
         .delete()
         .eq('telegram_id', user.telegram_id);
@@ -264,7 +264,7 @@ export default function AdminUsersPage() {
       }
     } else {
       // Добавляем админа
-      const { error } = await db
+      const { error } = await supabase
         .from('admins')
         .insert({
           telegram_id: user.telegram_id,
@@ -302,7 +302,7 @@ export default function AdminUsersPage() {
 
         {/* Статистика */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
             <Card className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-lg">
@@ -329,6 +329,18 @@ export default function AdminUsersPage() {
 
             <Card className="p-4">
               <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/10 rounded-lg">
+                  <UserPlus className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.newUsersToday}</p>
+                  <p className="text-xs text-muted-foreground">Новые за день</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-500/10 rounded-lg">
                   <Calendar className="w-5 h-5 text-blue-500" />
                 </div>
@@ -347,6 +359,66 @@ export default function AdminUsersPage() {
                 <div>
                   <p className="text-2xl font-bold">{stats.activeMonth}</p>
                   <p className="text-xs text-muted-foreground">За месяц</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500/10 rounded-lg">
+                  <Repeat className="w-5 h-5 text-indigo-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.day1RetentionPct}%</p>
+                  <p className="text-xs text-muted-foreground">D+1 retention</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-violet-500/10 rounded-lg">
+                  <Repeat className="w-5 h-5 text-violet-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.week1RetentionPct}%</p>
+                  <p className="text-xs text-muted-foreground">W+1 retention</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-red-500/10 rounded-lg">
+                  <Ban className="w-5 h-5 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.blockedUsers}</p>
+                  <p className="text-xs text-muted-foreground">Блокировали ({stats.blockedUsersPct}%)</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-amber-500/10 rounded-lg">
+                  <Bug className="w-5 h-5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.unrecognizedRequests}</p>
+                  <p className="text-xs text-muted-foreground">Нераспознанные запросы</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-rose-500/10 rounded-lg">
+                  <Bug className="w-5 h-5 text-rose-500" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold">{stats.botCrashes}</p>
+                  <p className="text-xs text-muted-foreground">Падения бота</p>
                 </div>
               </div>
             </Card>

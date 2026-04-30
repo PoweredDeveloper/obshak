@@ -26,7 +26,7 @@ def get_all_groups_from_db():
     """Получает список всех групп из базы данных"""
     env_vars = load_env()
     supabase_url = env_vars.get('VITE_SUPABASE_URL')
-    supabase_key = env_vars.get('VITE_SUPABASE_PUBLISHABLE_KEY')
+    supabase_key = env_vars.get('SUPABASE_SERVICE_ROLE_KEY') or env_vars.get('VITE_SUPABASE_SERVICE_ROLE_KEY')
     
     if not supabase_url or not supabase_key:
         print("❌ Не найдены переменные окружения Supabase")

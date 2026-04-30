@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { db } from '@/integrations/postgrest/client';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useTeacherRating(teacherId: string) {
@@ -11,7 +11,7 @@ export function useTeacherRating(teacherId: string) {
     mutationFn: async (rating: number) => {
       if (!profile?.id) throw new Error('Not authenticated');
 
-      const { error } = await db
+      const { error } = await supabase
         .from('teacher_ratings')
         .upsert({
           teacher_id: teacherId,

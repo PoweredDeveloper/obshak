@@ -1,5 +1,4 @@
-import { db, publicApiOrigin } from '@/integrations/postgrest/client';
-import { getUser, setAccessToken } from '@/integrations/postgrest/session';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface DbProfile {
   id: string;
@@ -18,7 +17,32 @@ export interface DbProfile {
   updated_at: string;
 }
 
-export interface TelegramLoginWidgetUser {
+export function getTelegramInitData(): string | null {
+  const tg = (window as typeof window & { Telegram?: { WebApp?: { initData?: string } } }).Telegram?.WebApp;
+  return tg?.initData || null;
+}
+
+export async function authenticateWithTelegram(initData: string): Promise<DbProfile> {
+  const { data, error } = await supabase.functions.invoke('telegram-auth', {
+    body: { initData },
+  });
+
+  if (error) throw new Error(error.message);
+  if (!data?.token_hash || !data?.email) throw new Error('Authentication failed');
+
+  const profile = data.profile as DbProfile;
+
+  const { error: otpError } = await supabase.auth.verifyOtp({
+    token_hash: data.token_hash,
+    type: 'magiclink',
+  });
+
+  if (otpError) throw new Error(`Session error: ${otpError.message}`);
+
+  return profile;
+}
+
+export interface TelegramLoginWidgetData {
   id: number;
   first_name: string;
   last_name?: string;
@@ -28,62 +52,28 @@ export interface TelegramLoginWidgetUser {
   hash: string;
 }
 
-declare global {
-  interface Window {
-    Telegram?: {
-      WebApp?: {
-        initData?: string;
-        ready?: () => void;
-        expand?: () => void;
-      };
-    };
-    onTelegramAuth?: (user: TelegramLoginWidgetUser) => void;
-  }
-}
-
-export function isTelegramWebApp(): boolean {
-  return !!(window.Telegram?.WebApp?.initData);
-}
-
-export function getTelegramInitData(): string | null {
-  return window.Telegram?.WebApp?.initData || null;
-}
-
-function telegramAuthUrl(): string {
-  const o = publicApiOrigin();
-  return o ? `${o}/auth/telegram` : '/auth/telegram';
-}
-
-export async function authenticateWithTelegram(initData: string): Promise<DbProfile> {
-  const res = await fetch(telegramAuthUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ initData }),
+export async function authenticateWithTelegramWebsite(loginWidgetData: TelegramLoginWidgetData): Promise<DbProfile> {
+  const { data, error } = await supabase.functions.invoke('telegram-auth', {
+    body: { loginWidgetData },
   });
-  const data = (await res.json()) as { access_token?: string; profile?: DbProfile; error?: string };
-  if (!res.ok) throw new Error(data.error ?? 'Authentication failed');
-  if (!data.access_token || !data.profile) throw new Error('Authentication failed');
 
-  setAccessToken(data.access_token);
-  return data.profile;
-}
+  if (error) throw new Error(error.message);
+  if (!data?.token_hash || !data?.email) throw new Error('Website authentication failed');
 
-export async function authenticateWithLoginWidget(userData: TelegramLoginWidgetUser): Promise<DbProfile> {
-  const res = await fetch(telegramAuthUrl(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ loginWidgetData: userData }),
+  const profile = data.profile as DbProfile;
+
+  const { error: otpError } = await supabase.auth.verifyOtp({
+    token_hash: data.token_hash,
+    type: 'magiclink',
   });
-  const data = (await res.json()) as { access_token?: string; profile?: DbProfile; error?: string };
-  if (!res.ok) throw new Error(data.error ?? 'Authentication failed');
-  if (!data.access_token || !data.profile) throw new Error('Authentication failed');
 
-  setAccessToken(data.access_token);
-  return data.profile;
+  if (otpError) throw new Error(`Session error: ${otpError.message}`);
+
+  return profile;
 }
 
 export async function updateProfile(updates: Partial<DbProfile>): Promise<DbProfile> {
-  const { data: { user } } = await getUser();
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
   const allowedFields = ['group_id', 'group_name', 'institute', 'course', 'semester', 'onboarded'];
@@ -94,7 +84,7 @@ export async function updateProfile(updates: Partial<DbProfile>): Promise<DbProf
     }
   }
 
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('profiles')
     .update(sanitized)
     .eq('id', user.id)
@@ -108,7 +98,7 @@ export async function updateProfile(updates: Partial<DbProfile>): Promise<DbProf
 }
 
 export async function fetchProfile(userId: string): Promise<DbProfile | null> {
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', userId)

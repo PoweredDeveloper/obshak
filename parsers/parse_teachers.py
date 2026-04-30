@@ -11,6 +11,8 @@ def parse_teachers():
     base_url = "https://www.kgasu.ru/universitet/person/prepodavateli/"
     
     all_teachers = []
+    seen_teachers = set()
+    seen_pages = set()
     page = 1
     
     while True:
@@ -80,13 +82,27 @@ def parse_teachers():
         if len(teachers) == 0:
             print(f"  ℹ️  Достигнута последняя страница")
             break
+
+        page_signature = tuple(
+            (teacher.get('full_name'), teacher.get('department'), teacher.get('email'))
+            for teacher in teachers
+        )
+        if page_signature in seen_pages:
+            print(f"  ℹ️  Страница повторяет уже загруженные данные, остановка")
+            break
+        seen_pages.add(page_signature)
         
-        all_teachers.extend(teachers)
+        for teacher in teachers:
+            teacher_key = (teacher.get('full_name'), teacher.get('department'), teacher.get('email'))
+            if teacher_key in seen_teachers:
+                continue
+            seen_teachers.add(teacher_key)
+            all_teachers.append(teacher)
         page += 1
         
-        # Защита от бесконечного цикла
-        if page > 20:
-            print(f"  ⚠️  Достигнут лимит страниц (20)")
+        # Защита от бесконечного цикла на случай изменения пагинации сайта
+        if page > 100:
+            print(f"  ⚠️  Достигнут лимит страниц (100)")
             break
     
     print(f"\n✅ Всего найдено преподавателей: {len(all_teachers)}")

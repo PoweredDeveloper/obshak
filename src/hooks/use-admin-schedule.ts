@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/integrations/postgrest/client';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Lesson {
   id: number;
@@ -47,7 +47,6 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [groupedLessons, setGroupedLessons] = useState<GroupedLesson[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Определяем какую таблицу использовать (lessons или lessons_test)
   const tableName = import.meta.env.VITE_TEST_MODE === 'true' ? 'lessons_test' : 'lessons';
@@ -56,21 +55,19 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
     if (!groupId) {
       setLessons([]);
       setGroupedLessons([]);
-      setError(null);
       return;
     }
 
     loadLessons();
-  }, [groupId, weekType, tableName]);
+  }, [groupId, weekType]);
 
   async function loadLessons() {
     if (!groupId) return;
 
     setLoading(true);
-    setError(null);
     const dbWeekType = weekType === 'even' ? 'Чет' : 'Неч';
-
-    const { data, error: fetchError } = await db
+    
+    const { data, error } = await supabase
       .from(tableName)
       .select('*')
       .eq('group_id', groupId)
@@ -78,9 +75,8 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
       .order('day_of_week')
       .order('lesson_number');
 
-    if (fetchError) {
-      console.error('Error loading lessons:', fetchError);
-      setError(fetchError.message);
+    if (error) {
+      console.error('Error loading lessons:', error);
       setLoading(false);
       return;
     }
@@ -193,7 +189,6 @@ export function useAdminSchedule(groupId: string | null, weekType: 'even' | 'odd
     lessons,
     groupedLessons,
     loading,
-    error,
     refresh,
   };
 }

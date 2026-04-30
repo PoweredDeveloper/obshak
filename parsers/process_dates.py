@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 load_dotenv('.env')
 
 # Подключение к Supabase
-SUPABASE_URL = "https://awswwgvlnhbtcfeexyqv.supabase.co"
-SUPABASE_KEY = os.getenv('VITE_SUPABASE_PUBLISHABLE_KEY')
+SUPABASE_URL = os.getenv('SUPABASE_URL') or os.getenv('VITE_SUPABASE_URL')
+SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('VITE_SUPABASE_SERVICE_ROLE_KEY')
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 

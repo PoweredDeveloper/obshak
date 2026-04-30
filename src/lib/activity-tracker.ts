@@ -1,16 +1,15 @@
-import { db } from '@/integrations/postgrest/client';
-import { auth } from '@/integrations/postgrest/session';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Обновляет last_active пользователя
  */
 export async function updateUserActivity() {
   try {
-    const { data: { user } } = await auth.getUser();
-
+    const { data: { user } } = await supabase.auth.getUser();
+    
     if (!user) return;
 
-    const { error } = await db
+    const { error } = await supabase
       .from('profiles')
       .update({ last_active: new Date().toISOString() })
       .eq('id', user.id);

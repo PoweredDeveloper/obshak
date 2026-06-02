@@ -5,6 +5,8 @@ from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQuer
 
 from messages import get_bot_copy
 
+HELP_IMAGE = 'image.png'
+
 # Загружаем переменные из .env
 load_dotenv()
 
@@ -54,7 +56,7 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # Отправляем фото с инструкцией
     try:
-        with open('image.png', 'rb') as photo:
+        with open(HELP_IMAGE, 'rb') as photo:
             await query.message.reply_photo(
                 photo=photo,
                 caption=copy.help_message,

@@ -1,0 +1,4 @@
+Contact: https://t.me/kgasu_schedule_bot
+Preferred-Languages: ru, en
+Policy: https://obshak.space/privacy.html
+Canonical: https://obshak.space/.well-known/security.txt

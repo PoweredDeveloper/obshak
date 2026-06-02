@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY bot_webhook_server.py .
 COPY messages.py .
+COPY image.png .
 
 ENV TELEGRAM_BOT_TOKEN=""
 ENV MINI_APP_URL=""

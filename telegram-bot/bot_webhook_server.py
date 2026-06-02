@@ -28,6 +28,8 @@ TELEGRAM_MIN_DELAY_SECONDS = float(os.environ.get('TELEGRAM_MIN_DELAY_SECONDS', 
 
 from messages import get_bot_copy
 
+HELP_IMAGE = os.path.join(os.path.dirname(__file__), 'image.png')
+
 
 def _supabase_headers():
     return {
@@ -240,6 +242,81 @@ async def _telegram_post_json(path: str, payload: dict) -> dict | None:
     return None
 
 
+async def _telegram_post_multipart(path: str, form: aiohttp.FormData) -> dict | None:
+    session = _get_http_session()
+    if not session:
+        return None
+
+    url = f'{TELEGRAM_API}/bot{BOT_TOKEN}{path}'
+    timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT_SECONDS)
+
+    for attempt in range(4):
+        try:
+            async with session.post(url, data=form, timeout=timeout) as resp:
+                data = await resp.json()
+                if resp.status == 429:
+                    retry_after = int(data.get('parameters', {}).get('retry_after', 1))
+                    await asyncio.sleep(max(1, retry_after))
+                    continue
+                if resp.status >= 500:
+                    await asyncio.sleep(min(2**attempt, 8))
+                    continue
+                return data
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            await asyncio.sleep(min(2**attempt, 8))
+    return None
+
+
+async def send_telegram_photo(
+    chat_id,
+    photo_path: str,
+    caption: str,
+    parse_mode='Markdown',
+    recipient_telegram_id=None,
+):
+    """Send photo via Telegram Bot API (multipart upload)."""
+    if not os.path.isfile(photo_path):
+        print(f'⚠️ Help image not found: {photo_path}')
+        return await send_telegram_message(
+            chat_id, caption, parse_mode=parse_mode, recipient_telegram_id=recipient_telegram_id
+        )
+
+    try:
+        form = aiohttp.FormData()
+        form.add_field('chat_id', str(chat_id))
+        form.add_field('caption', caption)
+        if parse_mode:
+            form.add_field('parse_mode', parse_mode)
+        with open(photo_path, 'rb') as photo_file:
+            form.add_field(
+                'photo',
+                photo_file.read(),
+                filename=os.path.basename(photo_path),
+                content_type='image/png',
+            )
+
+        result = await _telegram_post_multipart('/sendPhoto', form)
+        if not result:
+            return None
+
+        if not result.get('ok'):
+            print(
+                f"⚠️ Telegram sendPhoto failed: {result.get('error_code')} {result.get('description')}"
+            )
+
+        if recipient_telegram_id:
+            if result.get('ok'):
+                await set_blocked_status(recipient_telegram_id, False, '')
+            elif result.get('error_code') == 403:
+                await set_blocked_status(recipient_telegram_id, True, result.get('description', ''))
+        return result
+    except Exception as e:
+        print(f'❌ Error sending photo: {e}')
+        return None
+
+
 async def send_telegram_message(chat_id, text, keyboard=None, parse_mode='Markdown', recipient_telegram_id=None):
     """Send message via Telegram Bot API"""
     payload = {
@@ -307,12 +384,22 @@ async def handle_start(payload):
 
 async def handle_help_callback(payload):
     """Handle help callback"""
-    chat_id = payload.get('callback_query', {}).get('message', {}).get('chat', {}).get('id')
-    user = payload.get('callback_query', {}).get('from', {}) or {}
+    callback = payload.get('callback_query', {})
+    chat_id = callback.get('message', {}).get('chat', {}).get('id')
+    user = callback.get('from', {}) or {}
     copy = get_bot_copy(user.get('first_name', ''))
 
+    callback_id = callback.get('id')
+    if callback_id:
+        await _telegram_post_json('/answerCallbackQuery', {'callback_query_id': callback_id})
+
     recipient_telegram_id = user.get('id')
-    await send_telegram_message(chat_id, copy.help_message, recipient_telegram_id=recipient_telegram_id)
+    await send_telegram_photo(
+        chat_id,
+        HELP_IMAGE,
+        copy.help_message,
+        recipient_telegram_id=recipient_telegram_id,
+    )
 
 async def process_update(payload):
     """Process incoming update"""

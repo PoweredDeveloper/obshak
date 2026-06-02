@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('theme') === 'dark')
+            document.documentElement.classList.add('dark');
+        } catch (e) {}
+        if (location.hash && location.hash.indexOf('tgWebAppData') !== -1) {
+          document.documentElement.classList.add('telegram-mini-app');
+        }
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Obshak</title>
+    <meta name="description" content="Расписание для студентов КГАСУ" />
+    <meta name="author" content="Obshak" />
+    <meta name="theme-color" content="#22ABE8" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <meta property="og:title" content="Obshak" />
+    <meta property="og:description" content="Расписание для студентов КГАСУ" />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/favicon-512.png" />
+
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:image" content="/favicon-512.png" />
+  </head>
+
+  <body>
+    <div id="root">
+      <div
+        id="app-boot"
+        style="
+          min-height: 100vh;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-family: system-ui, -apple-system, sans-serif;
+          color: #111;
+          background: #fff;
+        "
+      >
+        Загрузка…
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      (function () {
+        if (!/Telegram/i.test(navigator.userAgent || '')) return;
+        window.setTimeout(function () {
+          var boot = document.getElementById('app-boot');
+          if (!boot || !document.getElementById('app-boot')) return;
+          var root = document.getElementById('root');
+          if (root && root.querySelector('[data-react-root], .animate-spin')) return;
+          boot.innerHTML =
+            '<div style="text-align:center;padding:0 16px;max-width:320px;line-height:1.5">' +
+            '<p style="margin:0 0 12px">Загрузка слишком долгая</p>' +
+            '<p style="margin:0 0 12px;font-size:14px;color:#666">Очистите кэш Telegram или сбросьте данные приложения</p>' +
+            '<a href="?reset=1" style="color:#0ea5e9;font-weight:600">Сбросить данные</a>' +
+            '</div>';
+        }, 22000);
+      })();
+    </script>
+  </body>
+</html>

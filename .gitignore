@@ -28,6 +28,7 @@ dist-ssr
 **/.env.*
 !.env.example
 .venv
+.venv-parsers
 
 # Caddy ACME certs + config (bind-mounted; do not commit)
 data/caddy-data/

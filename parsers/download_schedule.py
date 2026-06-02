@@ -99,10 +99,11 @@ def main():
         print(f"  - {link['type'].upper()}: {link['text']}")
         print(f"    URL: {link['url']}")
     
-    # Скачиваем первый файл для теста
     if links:
-        print("\n📥 Скачивание первого файла...")
-        download_file(links[0]['url'])
+        print("\n📥 Скачивание...")
+        docx_first = next((l for l in links if l.get('type') == 'docx'), None)
+        pick = docx_first or links[0]
+        download_file(pick['url'])
 
 if __name__ == '__main__':
     main()

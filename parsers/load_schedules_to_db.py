@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """
-Загрузка расписаний в Postgres (DATABASE_URL).
+Загрузка расписаний в Postgres.
+
+Подключение: DATABASE_URL, либо POSTGRES_HOST/POSTGRES_PORT/POSTGRES_PASSWORD/POSTGRES_DB
+(по умолчанию localhost:54322 — локальный `supabase start`).
+
+Перед вставкой занятий создаёт недостающие строки в `groups` по именам из .docx
+(можно восстановить БД без предзаполненных групп).
 """
 import os
 from pathlib import Path
@@ -30,16 +36,52 @@ def load_env():
 
 def connect():
     url = os.environ.get('DATABASE_URL')
-    if not url:
-        env = load_env()
-        pw = env.get('POSTGRES_PASSWORD', 'postgres')
-        url = f"postgresql://postgres:{pw}@localhost:5432/obshak"
-    return psycopg2.connect(url)
+    if url:
+        return psycopg2.connect(url)
+    env = load_env()
+    pw = env.get('POSTGRES_PASSWORD', 'postgres')
+    host = env.get('POSTGRES_HOST', '127.0.0.1')
+    port = env.get('POSTGRES_PORT', '54322')
+    db = env.get('POSTGRES_DB', 'postgres')
+    user = env.get('POSTGRES_USER', 'postgres')
+    return psycopg2.connect(
+        f"postgresql://{user}:{pw}@{host}:{port}/{db}",
+    )
 
 
 def get_group_id_map(cur):
     cur.execute("SELECT id::text, name FROM groups")
     return {row[1]: row[0] for row in cur.fetchall()}
+
+
+def collect_group_names_from_files(docx_files):
+    names = set()
+    for file_path in docx_files:
+        try:
+            lessons = parse_schedule_docx(str(file_path))
+            for lesson in lessons or []:
+                g = lesson.get('group_name')
+                if g:
+                    names.add(g)
+        except Exception as e:
+            print(f"  ⚠️  Пропуск {file_path.name} при сборе групп: {e}")
+    return names
+
+
+def ensure_groups_exist(cur, names):
+    if not names:
+        return 0
+    cur.execute("SELECT name FROM groups")
+    existing = {row[0] for row in cur.fetchall()}
+    added = 0
+    for name in sorted(names):
+        if name not in existing:
+            cur.execute("INSERT INTO groups (name) VALUES (%s)", (name,))
+            added += 1
+            existing.add(name)
+    if added:
+        print(f"✓ Добавлено групп в БД: {added}")
+    return added
 
 
 def clear_lessons(cur):
@@ -102,20 +144,37 @@ def main():
     cur = conn.cursor()
     print("✓ Подключено")
 
-    print("\n📋 Получение списка групп...")
-    group_id_map = get_group_id_map(cur)
-    print(f"✓ Найдено групп в базе: {len(group_id_map)}")
-
-    clear_lessons(cur)
-    conn.commit()
-
     schedules_dir = Path(__file__).resolve().parent / 'schedules'
     if not schedules_dir.exists():
         print("❌ Папка parsers/schedules не найдена")
         return
 
-    docx_files = list(schedules_dir.glob('*.docx')) + list(schedules_dir.glob('*.doc'))
-    print(f"\n📂 Найдено файлов расписаний: {len(docx_files)}")
+    docx_files = sorted(
+        set(schedules_dir.glob('*.docx')) | set(schedules_dir.glob('*.doc'))
+    )
+    pdf_count = len(list(schedules_dir.glob('*.pdf')))
+    if pdf_count:
+        print(f"ℹ️  Пропущено PDF (парсер Word): {pdf_count}")
+    print(f"\n📂 Найдено файлов Word: {len(docx_files)}")
+    if not docx_files:
+        print(
+            "❌ Нет .docx/.doc — положи файлы в parsers/schedules или запусти "
+            "parsers/download_schedules_index.py"
+        )
+        cur.close()
+        conn.close()
+        return
+
+    print("\n📋 Имена групп из файлов → создание строк в groups при необходимости...")
+    group_names = collect_group_names_from_files(docx_files)
+    ensure_groups_exist(cur, group_names)
+    conn.commit()
+
+    group_id_map = get_group_id_map(cur)
+    print(f"✓ Групп в базе: {len(group_id_map)}")
+
+    clear_lessons(cur)
+    conn.commit()
 
     total_loaded = 0
     total_skipped = 0

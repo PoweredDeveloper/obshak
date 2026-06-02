@@ -1,0 +1,1 @@
+"""Obshak FastAPI backend."""

@@ -10,23 +10,33 @@ import re
 from supabase import create_client
 
 def load_env():
-    """Загружает переменные окружения из .env"""
-    env_path = Path('.env')
+    """Загружает переменные окружения из .env (корень репозитория)."""
     env_vars = {}
-    if env_path.exists():
+    for env_path in (
+        Path(__file__).resolve().parents[1] / '.env',
+        Path('.env'),
+    ):
+        if not env_path.exists():
+            continue
         with open(env_path, 'r', encoding='utf-8') as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
                     env_vars[key] = value.strip('"').strip("'")
+        break
     return env_vars
 
 def get_all_groups_from_db():
     """Получает список всех групп из базы данных"""
     env_vars = load_env()
-    supabase_url = env_vars.get('VITE_SUPABASE_URL')
-    supabase_key = env_vars.get('SUPABASE_SERVICE_ROLE_KEY') or env_vars.get('VITE_SUPABASE_SERVICE_ROLE_KEY')
+    supabase_url = (
+        env_vars.get('SUPABASE_URL')
+        or env_vars.get('VITE_SUPABASE_URL')
+    )
+    supabase_key = env_vars.get('SUPABASE_SERVICE_ROLE_KEY') or env_vars.get(
+        'VITE_SUPABASE_SERVICE_ROLE_KEY'
+    )
     
     if not supabase_url or not supabase_key:
         print("❌ Не найдены переменные окружения Supabase")
@@ -98,9 +108,11 @@ def extract_schedule_link(html, group_name):
     
     return None
 
-def download_file(url, output_dir='schedules'):
-    """Скачивает файл"""
-    Path(output_dir).mkdir(exist_ok=True)
+def download_file(url, output_dir=None):
+    """Скачивает файл в parsers/schedules"""
+    if output_dir is None:
+        output_dir = Path(__file__).resolve().parent / 'schedules'
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
     
     filename = url.split('/')[-1]
     # Декодируем URL-encoded имя файла

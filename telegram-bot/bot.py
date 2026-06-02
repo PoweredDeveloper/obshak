@@ -3,11 +3,13 @@ from dotenv import load_dotenv
 from telegram import Update, WebAppInfo, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
+from messages import get_bot_copy
+
 # Загружаем переменные из .env
 load_dotenv()
 
 # Токен бота и URL Mini App
-BOT_TOKEN = os.getenv('BOT_TOKEN')
+BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN') or os.getenv('BOT_TOKEN')
 MINI_APP_URL = os.getenv('MINI_APP_URL')
 
 if not BOT_TOKEN or BOT_TOKEN == 'your_bot_token_here':
@@ -22,37 +24,24 @@ if not MINI_APP_URL or MINI_APP_URL == 'https://your-app-url.com':
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
     user = update.effective_user
+    copy = get_bot_copy(user.first_name if user else "")
     
     # Создаем inline кнопку с Web App (будет синяя)
     keyboard = [
         [InlineKeyboardButton(
-            text="🎓 Открыть Obshak",
+            text=copy.open_button_text,
             web_app=WebAppInfo(url=MINI_APP_URL)
         )],
         [InlineKeyboardButton(
-            text="📱 Как добавить на главный экран?",
-            callback_data="help_home_screen"
+            text=copy.help_button_text,
+            callback_data=copy.help_callback_data
         )]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     # Отправляем приветственное сообщение
-    message = (
-        f"👋 Привет, {user.first_name}!\n\n"
-        f"🎓 Добро пожаловать в Obshak — платформу для студентов КГАСУ!\n\n"
-        f"⚠️ *Сейчас идет бета-тестирование*\n"
-        f"Если приложение не загружается, попробуй включить VPN.\n"
-        f"Скоро исправим! 🔧\n\n"
-        f"Здесь ты можешь:\n"
-        f"• 📆 Смотреть расписание своей группы\n"
-        f"• 👥 Смотреть расписание друзей\n"
-        f"• 👨‍🏫 Оценивать преподавателей\n"
-        f"• 🛠️ Находить услуги от студентов\n\n"
-        f"Нажми на кнопку ниже, чтобы начать! 👇"
-    )
-    
     await update.message.reply_text(
-        message,
+        copy.start_message,
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
@@ -61,34 +50,20 @@ async def help_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик нажатия на кнопку помощи"""
     query = update.callback_query
     await query.answer()
-    
-    help_text = (
-        "📱 *Как добавить Obshak на главный экран*\n\n"
-        "*На Android:*\n"
-        "1. Открой приложение через кнопку выше\n"
-        "2. Нажми на три точки (⋮) в правом верхнем углу\n"
-        "3. Выбери \"Добавить на главный экран\"\n"
-        "4. Готово! Теперь можно открывать как обычное приложение 🎉\n\n"
-        "*На iPhone:*\n"
-        "1. Открой приложение через кнопку выше\n"
-        "2. Нажми на \"Поделиться\" (квадрат со стрелкой)\n"
-        "3. Выбери \"На экран Домой\"\n"
-        "4. Готово! Иконка появится на главном экране 🎉\n\n"
-        "💡 После добавления приложение будет открываться мгновенно!"
-    )
+    copy = get_bot_copy(query.from_user.first_name if query and query.from_user else "")
     
     # Отправляем фото с инструкцией
     try:
         with open('image.png', 'rb') as photo:
             await query.message.reply_photo(
                 photo=photo,
-                caption=help_text,
+                caption=copy.help_message,
                 parse_mode='Markdown'
             )
     except FileNotFoundError:
         # Если фото не найдено, отправляем просто текст
         await query.message.reply_text(
-            help_text,
+            copy.help_message,
             parse_mode='Markdown'
         )
 

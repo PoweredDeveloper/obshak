@@ -8,7 +8,7 @@ Obshak is a KGASU student schedule web app built with Vite, React, TypeScript, T
 
 Main runtime pieces:
 
-- Frontend: `src/`, built by `Dockerfile`, served through `nginx.conf` inside the `app` container.
+- Frontend: `frontend/` (Vite React app in `frontend/src/`), built by `frontend/Dockerfile`, served through `frontend/nginx.conf` inside the `app` container.
 - Public proxy: `Caddyfile`, mounted into the `caddy` container from `docker-compose.yml`.
 - Telegram bot webhook: `telegram-bot/`, exposed at `/telegram-webhook`.
 - Supabase local project: `supabase/`, normally started outside compose with `supabase start`.
@@ -25,25 +25,25 @@ The app is intended to work in two auth modes:
 Install frontend dependencies:
 
 ```bash
-npm install
+cd frontend && npm install
 ```
 
 Run local frontend:
 
 ```bash
-npm run dev
+cd frontend && npm run dev
 ```
 
 Build frontend:
 
 ```bash
-npm run build
+cd frontend && npm run build
 ```
 
 Run lint:
 
 ```bash
-npm run lint
+cd frontend && npm run lint
 ```
 
 Start/rebuild production-ish Docker services:
@@ -100,9 +100,9 @@ Keep direct access to Supabase Studio port `54323` closed at the server/firewall
 
 ## Routing And Auth Rules
 
-Main app routes are in `src/App.tsx`.
+Main app routes are in `frontend/src/App.tsx`.
 
-Admin access is controlled by `src/hooks/use-admin.ts` and `src/contexts/AuthContext.tsx`. The source of truth is the `public.admins` table, matched by `profiles.telegram_id`.
+Admin access is controlled by `frontend/src/hooks/use-admin.ts` and `frontend/src/contexts/AuthContext.tsx`. The source of truth is the `public.admins` table, matched by `profiles.telegram_id`.
 
 Current admin UX:
 
@@ -120,12 +120,12 @@ Schema lives primarily in:
 
 - `db/init/01_schema.sql`
 - `supabase/migrations/`
-- generated TypeScript types in `src/integrations/supabase/types.ts`
+- generated TypeScript types in `frontend/src/integrations/supabase/types.ts`
 
 Frontend Supabase client:
 
 ```text
-src/integrations/supabase/client.ts
+frontend/src/integrations/supabase/client.ts
 ```
 
 Do not put service-role keys in frontend code. Use service-role only in trusted scripts, Edge Functions, or server-side code.
@@ -145,11 +145,11 @@ Important tables:
 
 ## Schedule UI Notes
 
-Student class cards are in `src/components/schedule/ClassCard.tsx`.
+Student class cards are in `frontend/src/components/schedule/ClassCard.tsx`.
 
-Admin class cards are in `src/components/schedule/AdminClassCard.tsx`.
+Admin class cards are in `frontend/src/components/schedule/AdminClassCard.tsx`.
 
-Lesson type colors are often HSL strings, for example `hsl(199, 85%, 55%)`. Use `getContrastColor` from `src/lib/utils.ts` for readable pill text. It supports HSL and hex; do not replace it with naive hex-only parsing.
+Lesson type colors are often HSL strings, for example `hsl(199, 85%, 55%)`. Use `getContrastColor` from `frontend/src/lib/utils.ts` for readable pill text. It supports HSL and hex; do not replace it with naive hex-only parsing.
 
 Known visual requirement:
 

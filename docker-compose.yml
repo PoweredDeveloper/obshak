@@ -1,15 +1,13 @@
 services:
   caddy:
     image: caddy:alpine
-    environment:
-      STUDIO_BASIC_AUTH_USER: ${STUDIO_BASIC_AUTH_USER}
-      STUDIO_BASIC_AUTH_HASH: ${STUDIO_BASIC_AUTH_HASH}
+    env_file:
+      - .env
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
-      # Bind mounts: survive `docker compose down -v` (named volumes would be removed)
       - ./data/caddy-data:/data
       - ./data/caddy-config:/config
     restart: unless-stopped
@@ -17,17 +15,36 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - app
+      - backend
 
   app:
     build:
-      context: .
+      context: ./frontend
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
         VITE_TELEGRAM_BOT_USERNAME: ${VITE_TELEGRAM_BOT_USERNAME}
         VITE_MAINTENANCE_MODE: ${VITE_MAINTENANCE_MODE:-false}
         VITE_TEST_MODE: ${VITE_TEST_MODE:-false}
+        VITE_API_URL: ${VITE_API_URL:-https://api.obshak.space}
     restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SUPABASE_URL: ${BACKEND_SUPABASE_URL:-${SUPABASE_URL}}
+      SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET}
+      SUPABASE_JWT_AUDIENCE: ${SUPABASE_JWT_AUDIENCE:-authenticated}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://obshak.space}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   telegram-bot:
     build:
@@ -35,10 +52,13 @@ services:
     environment:
       BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       MINI_APP_URL: ${MINI_APP_URL}
+      WEBSITE_URL: ${WEBSITE_URL:-${BASE_URL:-https://obshak.space}}
       WEBHOOK_PATH: /telegram-webhook
       BASE_URL: ${BASE_URL:-https://obshak.space}
-      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_URL: ${BOT_SUPABASE_URL:-http://host.docker.internal:54321}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - caddy

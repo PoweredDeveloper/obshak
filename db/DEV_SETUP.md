@@ -14,7 +14,7 @@ Postgres init runs SQL in `db/init/`. PostgREST listens inside the compose netwo
 ## Vite dev (host machine)
 
 1. `docker compose up -d postgres postgrest auth` (or full stack).
-2. `pnpm dev` — `vite.config.ts` proxies `/rest/v1` → `localhost:3000`, `/auth` → `localhost:3001`.
+2. `cd frontend && pnpm dev` — `frontend/vite.config.ts` proxies API routes as configured.
 3. `.env`: `VITE_PUBLIC_API_ORIGIN=` (empty = relative URLs on `localhost:8080`).
 
 ## Import existing data

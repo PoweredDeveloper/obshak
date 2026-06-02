@@ -5,6 +5,14 @@ Register Telegram webhook after bot token rotation or server migration.
 Run from project root (loads .env):
   python3 telegram-bot/set_webhook.py
 
+Deps (Debian/Ubuntu — avoid pip on system Python):
+  sudo apt install python3-aiohttp python3-dotenv
+
+Or use curl (no Python deps):
+  curl -X POST "https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook" \\
+    -H "Content-Type: application/json" \\
+    -d '{"url":"https://obshak.space/telegram-webhook","drop_pending_updates":true}'
+
 Requires outbound HTTPS to api.telegram.org (VPN if blocked).
 """
 import asyncio

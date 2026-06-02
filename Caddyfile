@@ -1,0 +1,61 @@
+{
+    # Telegram in-app browser + some VPNs can hang on HTTP/3 (QUIC).
+    # Force HTTP/1.1 + HTTP/2 only.
+    servers {
+        protocols h1 h2
+    }
+}
+
+www.obshak.space {
+    redir https://obshak.space{uri} permanent
+}
+
+obshak.space, app.obshak.space {
+    encode gzip
+
+    # Does not remove Safe Browsing / Apple fraud flags, but good hygiene + fewer mixed-signal proxies
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Telegram bot webhook endpoint
+    reverse_proxy /telegram-webhook telegram-bot:8080
+
+    # Supabase API gateway running on host via `supabase start`
+    reverse_proxy /rest/* host.docker.internal:54321
+    reverse_proxy /auth/* host.docker.internal:54321
+    reverse_proxy /functions/* host.docker.internal:54321
+    reverse_proxy /realtime/* host.docker.internal:54321
+    reverse_proxy /storage/* host.docker.internal:54321
+
+    # Frontend app
+    reverse_proxy app:80
+}
+
+# Public FastAPI backend (Swagger at /docs, ReDoc at /redoc).
+api.obshak.space {
+    encode gzip
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # Loosen CORS-style headers? CORS itself is handled by the FastAPI middleware.
+    }
+
+    reverse_proxy backend:8000
+}
+
+# Studio: point DNS studio.obshak.space here. Requires STUDIO_BASIC_AUTH_USER + STUDIO_BASIC_AUTH_HASH
+# in the caddy service environment (see .env.example). Keep port 54323 closed publicly otherwise.
+studio.obshak.space {
+    encode gzip
+
+    basic_auth {
+        {$STUDIO_BASIC_AUTH_USER} {$STUDIO_BASIC_AUTH_HASH}
+    }
+
+    reverse_proxy host.docker.internal:54323
+}
